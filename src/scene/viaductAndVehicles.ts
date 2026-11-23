@@ -623,8 +623,8 @@ export function createViaductAndVehicles(
     viaductGroup.add(checkRail);
   }
 
-  // Concrete Viaduct Piers straddling wider road cleanly at x = ±6.5 and outer flanks ±16.8
-  const pierXs = [-16.8, -6.5, 6.5, 16.8];
+  // Concrete Viaduct Piers straddling road cleanly at ±6.5 and outer flanks -17.2 / +18.9 (unobstructed B4 24H mart!)
+  const pierXs = [-17.2, -6.5, 6.5, 18.9];
   const pierShadowMat = new THREE.MeshBasicMaterial({
     map: shadowTex,
     transparent: true,
@@ -1607,38 +1607,38 @@ export function createViaductAndVehicles(
   });
   applyRadialMistFade(tramNumPlateMat, mistUniforms, vehicleFade);
 
-  // Warm illuminated interior surfaces (makes the 3D cabin glow jewel-like from within!)
+  // Warm illuminated interior surfaces balanced so 3D teak benches, brass poles & passengers read crisply!
   const tramCabinWarmWallMat = new THREE.MeshStandardMaterial({
-    color: 0xf0d29c,
-    emissive: new THREE.Color(0xffb44c),
-    emissiveIntensity: 1.15,
-    roughness: 0.70
+    color: 0xe6c38c,
+    emissive: new THREE.Color(0xffaa44),
+    emissiveIntensity: 0.76,
+    roughness: 0.72
   });
   applyRadialMistFade(tramCabinWarmWallMat, mistUniforms, vehicleFade);
-  emissiveTracks.push({ mat: tramCabinWarmWallMat, base: 1.15 });
+  emissiveTracks.push({ mat: tramCabinWarmWallMat, base: 0.76 });
 
   const tramCeilingStripMat = new THREE.MeshStandardMaterial({
-    color: 0xfff4d6,
-    emissive: new THREE.Color(0xffcd6e),
-    emissiveIntensity: 2.15,
-    roughness: 0.2
+    color: 0xfff0c8,
+    emissive: new THREE.Color(0xffc662),
+    emissiveIntensity: 1.55,
+    roughness: 0.22
   });
   applyRadialMistFade(tramCeilingStripMat, mistUniforms, vehicleFade);
-  emissiveTracks.push({ mat: tramCeilingStripMat, base: 2.15 });
+  emissiveTracks.push({ mat: tramCeilingStripMat, base: 1.55 });
 
-  // Translucent rain-misted amber cabin glass (lets 3D interior benches, brass poles & passengers show through!)
+  // Crystal-clear rain-glinted cabin glass letting the jewel-like 3D interior shine through cleanly
   const tramWindowGlassMat = new THREE.MeshStandardMaterial({
-    color: 0xffd286,
-    emissive: new THREE.Color(0xffa93e),
-    emissiveIntensity: 0.76,
+    color: 0xdaf0ff,
+    emissive: new THREE.Color(0xffb44c),
+    emissiveIntensity: 0.22,
     transparent: true,
-    opacity: 0.42,
-    roughness: 0.14,
-    metalness: 0.22,
+    opacity: 0.24,
+    roughness: 0.10,
+    metalness: 0.28,
     depthWrite: false
   });
   applyRadialMistFade(tramWindowGlassMat, mistUniforms, { ...vehicleFade, fadeAlpha: true });
-  emissiveTracks.push({ mat: tramWindowGlassMat, base: 0.76 });
+  emissiveTracks.push({ mat: tramWindowGlassMat, base: 0.22 });
 
   const tramPaxCoatMats = [0x2a3542, 0x3b2c2a, 0x263834, 0x45382e].map((hex) => {
     const m = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.82 });
@@ -2222,6 +2222,28 @@ export function createViaductAndVehicles(
     tramWiper.position.set(-0.22, 1.56, halfTL + 0.01);
     tramWiper.rotation.z = 0.25;
     tramGroup.add(tramWiper);
+
+    // Classic Hong Kong tram driver side-view mirrors & upper corner amber marker lamps
+    for (const side of [-1, 1]) {
+      const mArm = markSkipPrintEdges(
+        new THREE.Mesh(new THREE.CylinderGeometry(0.010, 0.010, 0.22, 6), tramBrassMat)
+      );
+      mArm.rotation.z = Math.PI / 2;
+      mArm.position.set(side * (halfTW + 0.09), 1.96, halfTL - 0.14);
+      tramGroup.add(mArm);
+
+      const mPad = markSkipPrintEdges(
+        new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.16, 0.08), trainSilverMat)
+      );
+      mPad.position.set(side * (halfTW + 0.19), 1.92, halfTL - 0.14);
+      tramGroup.add(mPad);
+
+      const cornerPip = markSkipPrintEdges(
+        new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), trainHeadMat)
+      );
+      cornerPip.position.set(side * (halfTW - 0.14), 3.90, halfTL + 0.02);
+      tramGroup.add(cornerPip);
+    }
   }
 
   // Ultra-soft Fresnel+axial misty tram headlight cone (ZERO hard silhouette!)

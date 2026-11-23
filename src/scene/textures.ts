@@ -836,16 +836,16 @@ export function createWetRoadTextures(): {
   const [roughC, rctx] = makeCanvas(W, H);
   const [alphaC, actx] = makeCanvas(W, H);
 
-  // Rich rain-soaked dark charcoal-slate asphalt (matching IMG_1635 wet tar contrast!)
-  ctx.fillStyle = '#242e3a';
+  // Rich rain-soaked dark charcoal-slate asphalt
+  ctx.fillStyle = '#202a36';
   ctx.fillRect(0, 0, W, H);
 
-  // Smooth damp sheen base roughness
-  rctx.fillStyle = '#4e4e4e';
+  // Calibrated damp-tarmac base roughness (prevents flat white specular wash outside puddles)
+  rctx.fillStyle = '#888888';
   rctx.fillRect(0, 0, W, H);
 
-  // Damp asphalt baseline alpha = 0.62 (158) across core road -> subtle continuous reflection everywhere!
-  actx.fillStyle = 'rgb(158, 158, 158)';
+  // Damp asphalt baseline alpha = 0.64 (164) across core road -> continuous subtle reflection everywhere
+  actx.fillStyle = 'rgb(164, 164, 164)';
   actx.fillRect(0, 0, W, H);
 
   // Fine rain-darkened aggregate grain
@@ -882,16 +882,15 @@ export function createWetRoadTextures(): {
   ctx.fillRect(W - 24, 0, 3, H);
   ctx.fillRect(W - 31, 0, 3, H);
 
-  // Broad, overlapping organic wet-rainwater sheets covering ~64% of the wider core road (|z| < 16.5)
-  // Smoothly blending between 0.30 (deep glossy wet sheets) and 0.60 (damp tar) — ZERO isolated mud hole!
+  // Broad, overlapping organic wet-rainwater sheets covering ~68% of the wider core road (|z| < 17.5)
   const sheets: Array<{ x: number; y: number; rx: number; ry: number; alpha: number }> = [
-    { x: 0.42, y: 0.50, rx: 0.40, ry: 0.14, alpha: 0.34 },
-    { x: 0.60, y: 0.54, rx: 0.38, ry: 0.14, alpha: 0.36 },
-    { x: 0.35, y: 0.61, rx: 0.36, ry: 0.12, alpha: 0.32 },
-    { x: 0.62, y: 0.65, rx: 0.36, ry: 0.12, alpha: 0.38 },
-    { x: 0.48, y: 0.41, rx: 0.42, ry: 0.12, alpha: 0.36 },
-    { x: 0.45, y: 0.70, rx: 0.38, ry: 0.08, alpha: 0.46 },
-    { x: 0.52, y: 0.34, rx: 0.38, ry: 0.08, alpha: 0.48 }
+    { x: 0.42, y: 0.50, rx: 0.42, ry: 0.14, alpha: 0.34 },
+    { x: 0.60, y: 0.54, rx: 0.40, ry: 0.14, alpha: 0.36 },
+    { x: 0.36, y: 0.61, rx: 0.38, ry: 0.13, alpha: 0.32 },
+    { x: 0.62, y: 0.65, rx: 0.38, ry: 0.13, alpha: 0.36 },
+    { x: 0.48, y: 0.41, rx: 0.44, ry: 0.13, alpha: 0.36 },
+    { x: 0.46, y: 0.71, rx: 0.40, ry: 0.10, alpha: 0.44 },
+    { x: 0.52, y: 0.33, rx: 0.40, ry: 0.10, alpha: 0.46 }
   ];
 
   for (const s of sheets) {
@@ -900,14 +899,14 @@ export function createWetRoadTextures(): {
     const rx = s.rx * W;
     const ry = s.ry * H;
 
-    // Gentle wet darkening (very subtle so it never looks like a mud stain!)
+    // Gentle wet darkening inside rain sheets
     ctx.save();
     ctx.translate(cx, cy);
     ctx.scale(1, ry / rx);
     const ag = ctx.createRadialGradient(0, 0, rx * 0.15, 0, 0, rx);
-    ag.addColorStop(0, 'rgba(10, 16, 24, 0.16)');
-    ag.addColorStop(0.75, 'rgba(10, 16, 24, 0.07)');
-    ag.addColorStop(1, 'rgba(10, 16, 24, 0)');
+    ag.addColorStop(0, 'rgba(8, 14, 22, 0.18)');
+    ag.addColorStop(0.75, 'rgba(8, 14, 22, 0.08)');
+    ag.addColorStop(1, 'rgba(8, 14, 22, 0)');
     ctx.fillStyle = ag;
     ctx.beginPath();
     ctx.arc(0, 0, rx, 0, Math.PI * 2);
@@ -919,9 +918,9 @@ export function createWetRoadTextures(): {
     rctx.translate(cx, cy);
     rctx.scale(1, ry / rx);
     const rg = rctx.createRadialGradient(0, 0, rx * 0.18, 0, 0, rx);
-    rg.addColorStop(0, 'rgba(16, 16, 16, 0.88)');
-    rg.addColorStop(0.7, 'rgba(32, 32, 32, 0.55)');
-    rg.addColorStop(1, 'rgba(78, 78, 78, 0)');
+    rg.addColorStop(0, 'rgba(34, 34, 34, 0.85)');
+    rg.addColorStop(0.7, 'rgba(64, 64, 64, 0.55)');
+    rg.addColorStop(1, 'rgba(136, 136, 136, 0)');
     rctx.fillStyle = rg;
     rctx.beginPath();
     rctx.arc(0, 0, rx, 0, Math.PI * 2);
@@ -936,7 +935,7 @@ export function createWetRoadTextures(): {
     const pg = actx.createRadialGradient(0, 0, rx * 0.2, 0, 0, rx);
     pg.addColorStop(0, `rgba(${val},${val},${val},0.88)`);
     pg.addColorStop(0.65, `rgba(${val + 28},${val + 28},${val + 28},0.65)`);
-    pg.addColorStop(1, 'rgba(158, 158, 158, 0)');
+    pg.addColorStop(1, 'rgba(164, 164, 164, 0)');
     actx.fillStyle = pg;
     actx.beginPath();
     actx.arc(0, 0, rx, 0, Math.PI * 2);
@@ -944,34 +943,36 @@ export function createWetRoadTextures(): {
     actx.restore();
   }
 
-  // Smoothly ramp outer Z ends (|z| > 19.2 -> v < 0.254 or v > 0.746 on 78-unit road) to pure WHITE (1.0)
-  // so PlanarWetReflector boundaries (|z| = 21.0) are 100% hidden under opaque wet asphalt!
-  const topFade = actx.createLinearGradient(0, 0, 0, H * 0.31);
+  // Long gentle ramp on outer Z ends (|z| in [13.5, 20.5]) to pure WHITE (1.0)
+  // so PlanarWetReflector bounds (|z| = 21.0) vanish with ZERO visible transition ring!
+  const topFade = actx.createLinearGradient(0, 0, 0, H * 0.34);
   topFade.addColorStop(0, 'rgb(255,255,255)');
-  topFade.addColorStop(0.82, 'rgb(255,255,255)');
+  topFade.addColorStop(0.68, 'rgb(255,255,255)');
+  topFade.addColorStop(0.86, 'rgba(255,255,255,0.45)');
   topFade.addColorStop(1, 'rgba(255,255,255,0)');
   actx.fillStyle = topFade;
-  actx.fillRect(0, 0, W, H * 0.31);
+  actx.fillRect(0, 0, W, H * 0.34);
 
-  const botFade = actx.createLinearGradient(0, H * 0.69, 0, H);
+  const botFade = actx.createLinearGradient(0, H * 0.66, 0, H);
   botFade.addColorStop(0, 'rgba(255,255,255,0)');
-  botFade.addColorStop(0.18, 'rgb(255,255,255)');
+  botFade.addColorStop(0.14, 'rgba(255,255,255,0.45)');
+  botFade.addColorStop(0.32, 'rgb(255,255,255)');
   botFade.addColorStop(1, 'rgb(255,255,255)');
   actx.fillStyle = botFade;
-  actx.fillRect(0, H * 0.69, W, H * 0.31);
+  actx.fillRect(0, H * 0.66, W, H * 0.34);
 
   // Subtle curb margin opaque feather
-  const leftFade = actx.createLinearGradient(0, 0, W * 0.09, 0);
+  const leftFade = actx.createLinearGradient(0, 0, W * 0.08, 0);
   leftFade.addColorStop(0, 'rgb(255,255,255)');
   leftFade.addColorStop(1, 'rgba(255,255,255,0)');
   actx.fillStyle = leftFade;
-  actx.fillRect(0, 0, W * 0.09, H);
+  actx.fillRect(0, 0, W * 0.08, H);
 
-  const rightFade = actx.createLinearGradient(W * 0.91, 0, W, 0);
+  const rightFade = actx.createLinearGradient(W * 0.92, 0, W, 0);
   rightFade.addColorStop(0, 'rgba(255,255,255,0)');
   rightFade.addColorStop(1, 'rgb(255,255,255)');
   actx.fillStyle = rightFade;
-  actx.fillRect(W * 0.91, 0, W * 0.09, H);
+  actx.fillRect(W * 0.92, 0, W * 0.08, H);
 
   return {
     albedo: toTexture(albedoC, { wrap: false }),
@@ -1530,82 +1531,133 @@ export function createShopInteriorTexture(
   return toTexture(canvas, { wrap: false });
 }
 
-export function createVendingMachineTexture(tint: 'cyan' | 'white' = 'cyan'): THREE.CanvasTexture {
+export function createVendingMachineTextureSet(
+  variant: 'teal' | 'crimson' = 'teal'
+): { map: THREE.CanvasTexture; emissiveMap: THREE.CanvasTexture } {
   const W = 256;
   const H = 512;
   const [canvas, ctx] = makeCanvas(W, H);
+  const [eCanvas, ectx] = makeCanvas(W, H);
 
-  ctx.fillStyle = tint === 'cyan' ? '#b0dce9' : '#d2e2ec';
+  const isTeal = variant === 'teal';
+  // Crisp painted metallic casing (does NOT glow in emissiveMap -> zero white blowout!)
+  ctx.fillStyle = isTeal ? '#234c5c' : '#8d2b2e';
   ctx.fillRect(0, 0, W, H);
-
-  ctx.strokeStyle = '#264458';
+  ctx.strokeStyle = isTeal ? '#142d38' : '#53181a';
   ctx.lineWidth = 10;
   ctx.strokeRect(5, 5, W - 10, H - 10);
 
+  // Emissive map starts pure black so ONLY backlit showcase, header & Octopus pad glow
+  ectx.fillStyle = '#000000';
+  ectx.fillRect(0, 0, W, H);
+
   // Backlit header banner (positioned cleanly below 3D top bezel)
-  ctx.fillStyle = tint === 'cyan' ? '#135b72' : '#245870';
+  ctx.fillStyle = isTeal ? '#0e3c4e' : '#6c1b1e';
   ctx.fillRect(18, 22, W - 36, 36);
-  ctx.fillStyle = '#e8fbff';
-  fitFontSize(ctx, '冷熱飲品 · 24H', 800, 19, 12, HK_SANS, W - 52);
+  ectx.fillStyle = isTeal ? '#1e6e88' : '#7a2c2c';
+  ectx.fillRect(18, 22, W - 36, 36);
+
+  const headerText = isTeal ? '冷熱飲品 · 維他茶飲' : '汽水飲品 · COLD DRINKS';
+  ctx.fillStyle = '#eefbff';
+  ectx.fillStyle = '#a8e8f8';
+  fitFontSize(ctx, headerText, 800, 17, 11, HK_SANS, W - 48);
+  ectx.font = ctx.font;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('冷熱飲品 · 24H', W * 0.5, 40);
+  ectx.textAlign = 'center';
+  ectx.textBaseline = 'middle';
+  ctx.fillText(headerText, W * 0.5, 40);
+  ectx.fillText(headerText, W * 0.5, 40);
 
-  // Bright illuminated beverage showcase backing (y = 62..320 aligned above 3D mid bezel)
+  // Illuminated beverage showcase backing (y = 62..320 aligned above 3D mid bezel)
   const g = ctx.createLinearGradient(0, 62, 0, 322);
-  g.addColorStop(0, '#e8fbff');
-  g.addColorStop(0.5, '#90e2f6');
-  g.addColorStop(1, '#54b6d4');
+  g.addColorStop(0, '#c8f0fa');
+  g.addColorStop(0.5, '#7cc6de');
+  g.addColorStop(1, '#488ea8');
   ctx.fillStyle = g;
   ctx.fillRect(18, 62, W - 36, 258);
 
-  const colors = ['#e0403c', '#2ca864', '#efa828', '#2c7cd6', '#e0588c', '#f4f8fc', '#46b8a6'];
+  const eg = ectx.createLinearGradient(0, 62, 0, 322);
+  eg.addColorStop(0, '#6ab8ce');
+  eg.addColorStop(0.55, '#3c88a4');
+  eg.addColorStop(1, '#205268');
+  ectx.fillStyle = eg;
+  ectx.fillRect(18, 62, W - 36, 258);
+
+  const colors = isTeal
+    ? ['#289458', '#e29e24', '#2c78c8', '#d43c36', '#eef4f8', '#44a89c', '#d85484']
+    : ['#d8322e', '#f0a624', '#2c76cc', '#2ea25e', '#f2f6fa', '#e46c26', '#9a48b8'];
+
   for (let row = 0; row < 4; row++) {
     const ry = 74 + row * 61;
     // Shelf rail + Hot/Cold indicator strip (blue cold / red hot)
-    ctx.fillStyle = '#1b3e54';
+    ctx.fillStyle = '#183242';
     ctx.fillRect(20, ry + 40, W - 40, 13);
-    ctx.fillStyle = row === 3 ? '#e8483c' : '#2898dc';
+    ectx.fillStyle = '#060c10';
+    ectx.fillRect(20, ry + 40, W - 40, 13);
+
+    const barCol = row === 3 ? '#e8483c' : '#2898dc';
+    ctx.fillStyle = barCol;
     ctx.fillRect(24, ry + 43, W - 48, 4);
+    ectx.fillStyle = barCol;
+    ectx.fillRect(24, ry + 43, W - 48, 4);
 
     for (let col = 0; col < 6; col++) {
       const bx = 28 + col * 34;
-      ctx.fillStyle = colors[(row * 3 + col) % colors.length];
+      const drinkCol = colors[(row * 3 + col) % colors.length];
+      ctx.fillStyle = drinkCol;
       ctx.fillRect(bx, ry + 6, 20, 33);
-      // White label band & cap
-      ctx.fillStyle = 'rgba(255,255,255,0.78)';
+      ectx.fillStyle = drinkCol;
+      ectx.globalAlpha = 0.55;
+      ectx.fillRect(bx, ry + 6, 20, 33);
+      ectx.globalAlpha = 1.0;
+
+      // Crisp label band & bottle cap
+      ctx.fillStyle = 'rgba(255,255,255,0.82)';
       ctx.fillRect(bx + 2, ry + 17, 16, 8);
       ctx.fillStyle = '#f2f8fc';
       ctx.fillRect(bx + 5, ry + 2, 10, 4);
+
       // Tiny glowing selection button
       ctx.fillStyle = '#e4f8ff';
       ctx.fillRect(bx + 4, ry + 49, 12, 3);
+      ectx.fillStyle = '#9eeaff';
+      ectx.fillRect(bx + 4, ry + 49, 12, 3);
     }
   }
 
-  // Lower control area (y = 356..468 aligned cleanly below 3D mid bezel & above bottom bezel)
-  ctx.fillStyle = '#152532';
+  // Lower control area (dark recessed pickup bay — stays dark in emissiveMap!)
+  ctx.fillStyle = '#15222c';
   ctx.fillRect(24, 364, W - 104, 96);
-  ctx.strokeStyle = '#6c8ea2';
+  ctx.strokeStyle = '#5e7a8c';
   ctx.lineWidth = 3;
   ctx.strokeRect(24, 364, W - 104, 96);
 
   // Octopus card contactless pad (八達通)
-  ctx.fillStyle = '#f4b43a';
+  ctx.fillStyle = '#f0ae34';
   ctx.fillRect(W - 68, 358, 46, 46);
+  ectx.fillStyle = '#c88422';
+  ectx.fillRect(W - 68, 358, 46, 46);
   ctx.fillStyle = '#1a2e3e';
   fitFontSize(ctx, '八達通', 800, 13, 9, HK_SANS, 40);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
   ctx.fillText('八達通', W - 45, 382);
 
   // Coin & bill slot panel
-  ctx.fillStyle = '#223848';
+  ctx.fillStyle = '#1c2e3c';
   ctx.fillRect(W - 68, 412, 46, 50);
   ctx.fillStyle = '#7ad4ec';
   ctx.fillRect(W - 58, 422, 26, 6);
+  ectx.fillStyle = '#58c0dc';
+  ectx.fillRect(W - 58, 422, 26, 6);
 
-  return toTexture(canvas, { wrap: false });
+  return {
+    map: toTexture(canvas, { wrap: false }),
+    emissiveMap: toTexture(eCanvas, { wrap: false })
+  };
+}
+
+export function createVendingMachineTexture(tint: 'cyan' | 'white' = 'cyan'): THREE.CanvasTexture {
+  return createVendingMachineTextureSet(tint === 'cyan' ? 'teal' : 'crimson').map;
 }
 
 export function createStreetPlaqueTexture(): THREE.CanvasTexture {
@@ -2116,33 +2168,52 @@ export function createBauhiniaCanopyTexture(seed = 808): THREE.CanvasTexture {
   const rand = mulberry32(seed);
   const [canvas, ctx] = makeCanvas(S, S);
 
-  ctx.fillStyle = '#d48eb0';
+  ctx.fillStyle = '#a86588';
   ctx.fillRect(0, 0, S, S);
 
-  const swatches = ['#f4c6db', '#e298ba', '#b86892', '#8a4c72', '#f8d8e6', '#c678a0'];
-  for (let i = 0; i < 420; i++) {
+  // Subtle emerald-olive Bauhinia leaf dapple underlying the blossoms
+  const leafSwatches = ['#2d5642', '#3c6e52', '#234436'];
+  for (let i = 0; i < 160; i++) {
     const x = rand() * S;
     const y = rand() * S;
-    const rx = 5 + rand() * 14;
-    const ry = 4 + rand() * 11;
+    const rx = 7 + rand() * 14;
+    const ry = 5 + rand() * 10;
     const ang = rand() * Math.PI;
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(ang);
-    ctx.fillStyle = swatches[Math.floor(rand() * swatches.length)];
-    ctx.globalAlpha = 0.55 + rand() * 0.4;
+    ctx.fillStyle = leafSwatches[Math.floor(rand() * leafSwatches.length)];
+    ctx.globalAlpha = 0.48 + rand() * 0.32;
     ctx.beginPath();
     ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
 
-  // Subtle dark botanical gaps for painterly foliage depth
-  for (let i = 0; i < 90; i++) {
+  const swatches = ['#f4c6db', '#e294b8', '#c66c9a', '#964c78', '#f9dde9', '#d47ca6'];
+  for (let i = 0; i < 380; i++) {
+    const x = rand() * S;
+    const y = rand() * S;
+    const rx = 5 + rand() * 12;
+    const ry = 4 + rand() * 9;
+    const ang = rand() * Math.PI;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ang);
+    ctx.fillStyle = swatches[Math.floor(rand() * swatches.length)];
+    ctx.globalAlpha = 0.62 + rand() * 0.34;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Subtle dark botanical shadow gaps for painterly foliage depth
+  for (let i = 0; i < 95; i++) {
     const x = rand() * S;
     const y = rand() * S;
     const r = 3 + rand() * 6;
-    ctx.fillStyle = 'rgba(54, 30, 52, 0.32)';
+    ctx.fillStyle = 'rgba(34, 42, 40, 0.30)';
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
@@ -2467,3 +2538,371 @@ export function createLouvreVentTexture(): THREE.CanvasTexture {
 
   return toTexture(canvas, { wrap: false });
 }
+
+/**
+ * Painterly deep tropical emerald foliage texture for Hong Kong Banyan / Ficus & Bauhinia leaves.
+ */
+export function createFoliageCanopyTexture(seed = 515): THREE.CanvasTexture {
+  const S = 256;
+  const rand = mulberry32(seed);
+  const [canvas, ctx] = makeCanvas(S, S);
+
+  ctx.fillStyle = '#2a4d3c';
+  ctx.fillRect(0, 0, S, S);
+
+  const swatches = ['#3c6b52', '#2f5944', '#4e7f62', '#1f3b2e', '#5a8b6a', '#284a39'];
+  for (let i = 0; i < 420; i++) {
+    const x = rand() * S;
+    const y = rand() * S;
+    const rx = 5 + rand() * 13;
+    const ry = 4 + rand() * 9;
+    const ang = rand() * Math.PI;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ang);
+    ctx.fillStyle = swatches[Math.floor(rand() * swatches.length)];
+    ctx.globalAlpha = 0.58 + rand() * 0.36;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  for (let i = 0; i < 85; i++) {
+    const x = rand() * S;
+    const y = rand() * S;
+    const r = 3 + rand() * 6;
+    ctx.fillStyle = 'rgba(14, 28, 22, 0.36)';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  return toTexture(canvas, { repeatX: 2, repeatY: 2 });
+}
+
+/**
+ * Classic Hong Kong MTR / Subway Exit lightbox fascia (灣仔站 A3 出口 · WAN CHAI EXIT A3).
+ * Canvas 1024 × 176 (AR = 5.818) matching BoxGeometry(4.36, 0.75, 0.16) (AR = 5.813) 1:1!
+ */
+export function createMtrExitSignTexture(): {
+  map: THREE.CanvasTexture;
+  emissiveMap: THREE.CanvasTexture;
+} {
+  const W = 1024;
+  const H = 176;
+  const draw = (emissiveOnly: boolean) => {
+    const [canvas, ctx] = makeCanvas(W, H);
+    // Deep Wan Chai Island-Line heritage teal-green fascia backdrop
+    ctx.fillStyle = emissiveOnly ? '#072a28' : '#0f4844';
+    ctx.fillRect(0, 0, W, H);
+
+    // Subtle top/bottom anodized trim bars
+    ctx.fillStyle = emissiveOnly ? '#000000' : '#1a282e';
+    ctx.fillRect(0, 0, W, 10);
+    ctx.fillRect(0, H - 10, W, 10);
+
+    // Classic crimson Hong Kong transit emblem badge on left
+    const badgeX = 24;
+    const badgeY = 24;
+    const badgeW = 128;
+    const badgeH = H - 48;
+    ctx.fillStyle = emissiveOnly ? '#a8222a' : '#b8242e';
+    ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
+    ctx.strokeStyle = '#f6f2e8';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(badgeX + 6, badgeY + 6, badgeW - 12, badgeH - 12);
+
+    // Stylized geometric transit glyph inside badge (symmetric forked loops + vertical bar)
+    ctx.strokeStyle = '#fff8ee';
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    const cx = badgeX + badgeW * 0.5;
+    const cy = badgeY + badgeH * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 30);
+    ctx.lineTo(cx, cy + 30);
+    ctx.moveTo(cx - 26, cy - 22);
+    ctx.quadraticCurveTo(cx, cy - 6, cx + 26, cy - 22);
+    ctx.moveTo(cx - 26, cy + 22);
+    ctx.quadraticCurveTo(cx, cy + 6, cx + 26, cy + 22);
+    ctx.stroke();
+
+    // Yellow-gold A3 exit square on right
+    const exW = 132;
+    const exX = W - exW - 24;
+    ctx.fillStyle = emissiveOnly ? '#d49a28' : '#e8b438';
+    ctx.fillRect(exX, badgeY, exW, badgeH);
+    ctx.fillStyle = '#121b20';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    fitFontSize(ctx, 'A3', 900, 68, 36, HK_SANS, exW - 18);
+    ctx.fillText('A3', exX + exW * 0.5, cy + 3);
+
+    // Center bilingual station exit legend
+    const midX = (badgeX + badgeW + exX) * 0.5;
+    const maxW = exX - (badgeX + badgeW) - 44;
+    ctx.fillStyle = emissiveOnly ? '#d8f6ee' : '#f8fbfa';
+    fitFontSize(ctx, '灣 仔 站  ·  出 口', 800, 52, 26, HK_SANS, maxW);
+    ctx.fillText('灣 仔 站  ·  出 口', midX, 66);
+
+    ctx.fillStyle = emissiveOnly ? '#8cd8cc' : '#cce8e2';
+    fitFontSize(ctx, 'WAN CHAI STATION  ·  SUBWAY EXIT', 700, 24, 14, HK_SANS, maxW);
+    ctx.fillText('WAN CHAI STATION  ·  SUBWAY EXIT', midX, 126);
+
+    return toTexture(canvas, { wrap: false });
+  };
+  return { map: draw(false), emissiveMap: draw(true) };
+}
+
+/**
+ * Iconic Hong Kong white thermoplastic road safety stencil: 望右 LOOK RIGHT / 望左 LOOK LEFT.
+ */
+export function createRoadStencilTexture(dir: 'left' | 'right'): THREE.CanvasTexture {
+  const W = 512;
+  const H = 256;
+  const rand = mulberry32(dir === 'right' ? 911 : 912);
+  const [canvas, ctx] = makeCanvas(W, H);
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.fillStyle = 'rgba(232, 238, 242, 0.82)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const zh = dir === 'right' ? '望   右' : '望   左';
+  const en = dir === 'right' ? 'LOOK RIGHT' : 'LOOK LEFT';
+  fitFontSize(ctx, zh, 900, 68, 32, HK_SANS, W - 48);
+  ctx.fillText(zh, W * 0.5, 68);
+
+  fitFontSize(ctx, en, 900, 50, 24, HK_SANS, W - 48);
+  ctx.fillText(en, W * 0.5, 138);
+
+  // Crisp directional arrow below lettering
+  const sign = dir === 'right' ? 1 : -1;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.5 - sign * 118, 198);
+  ctx.lineTo(W * 0.5 + sign * 64, 198);
+  ctx.lineTo(W * 0.5 + sign * 64, 180);
+  ctx.lineTo(W * 0.5 + sign * 124, 206);
+  ctx.lineTo(W * 0.5 + sign * 64, 232);
+  ctx.lineTo(W * 0.5 + sign * 64, 214);
+  ctx.lineTo(W * 0.5 - sign * 118, 214);
+  ctx.closePath();
+  ctx.fill();
+
+  // Subtle tire-wear tarmac abrasion speckles so stencil sits organically on wet asphalt
+  ctx.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < 480; i++) {
+    const x = rand() * W;
+    const y = rand() * H;
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.14 + rand() * 0.28})`;
+    ctx.fillRect(x, y, 2 + rand() * 5, 2 + rand() * 4);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
+  return toTexture(canvas, { wrap: false });
+}
+
+/**
+ * Iconic Hong Kong yellow tactile guide-path paving tile texture (觸覺引路帶 / 導盲磚).
+ */
+export function createTactilePavingTexture(kind: 'strip' | 'blister'): THREE.CanvasTexture {
+  const S = 128;
+  const [canvas, ctx] = makeCanvas(S, S);
+
+  ctx.fillStyle = '#c89b2e';
+  ctx.fillRect(0, 0, S, S);
+
+  // Subtle weathered tile border
+  ctx.strokeStyle = 'rgba(42, 34, 14, 0.42)';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, S - 4, S - 4);
+
+  if (kind === 'strip') {
+    for (let x = 14; x < S - 10; x += 24) {
+      ctx.fillStyle = '#e6bd4e';
+      ctx.fillRect(x, 8, 11, S - 16);
+      ctx.fillStyle = 'rgba(54, 40, 12, 0.34)';
+      ctx.fillRect(x + 10, 8, 3, S - 16);
+    }
+  } else {
+    for (let y = 18; y < S; y += 26) {
+      for (let x = 18; x < S; x += 26) {
+        ctx.fillStyle = 'rgba(54, 40, 12, 0.36)';
+        ctx.beginPath();
+        ctx.arc(x + 2, y + 2, 7.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ebc456';
+        ctx.beginPath();
+        ctx.arc(x, y, 7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  return toTexture(canvas, { wrap: true });
+}
+
+/**
+ * Classic circular cast-iron Hong Kong Waterworks / Drainage manhole cover (水務署 / DC).
+ */
+export function createManholeTexture(): THREE.CanvasTexture {
+  const S = 192;
+  const [canvas, ctx] = makeCanvas(S, S);
+  ctx.clearRect(0, 0, S, S);
+
+  const cx = S * 0.5;
+  const cy = S * 0.5;
+  ctx.fillStyle = '#2d3740';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 90, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#53626e';
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 84, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#1b2228';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 66, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Radial cast-iron tread ribs
+  ctx.strokeStyle = 'rgba(128, 146, 160, 0.42)';
+  ctx.lineWidth = 3;
+  for (let i = 0; i < 12; i++) {
+    const ang = (i / 12) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(ang) * 32, cy + Math.sin(ang) * 32);
+    ctx.lineTo(cx + Math.cos(ang) * 78, cy + Math.sin(ang) * 78);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = '#36424c';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 30, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#9aa8b4';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  fitFontSize(ctx, 'HK DC', 800, 18, 12, HK_SANS, 48);
+  ctx.fillText('HK DC', cx, cy + 1);
+
+  return toTexture(canvas, { wrap: false });
+}
+
+/**
+ * Vintage Hong Kong illuminated telephone booth crown header (電 話 · TEL).
+ * Canvas 256 × 80 (AR = 3.20) matching 0.86 × 0.27 crown fascia (AR = 3.185) 1:1!
+ */
+export function createPhoneBoothSignTexture(): THREE.CanvasTexture {
+  const W = 256;
+  const H = 80;
+  const [canvas, ctx] = makeCanvas(W, H);
+
+  ctx.fillStyle = '#b62a2a';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#f2e8d6';
+  ctx.lineWidth = 5;
+  ctx.strokeRect(4, 4, W - 8, H - 8);
+
+  ctx.fillStyle = '#fff6e4';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  fitFontSize(ctx, '電 話  ·  TEL', 800, 34, 18, HK_SANS, W - 28);
+  ctx.fillText('電 話  ·  TEL', W * 0.5, H * 0.53);
+
+  return toTexture(canvas, { wrap: false });
+}
+
+/**
+ * Delicate soft concentric raindrop ripple texture (replaces hard polygonal RingGeometry circles).
+ */
+export function createRippleTexture(): THREE.CanvasTexture {
+  const S = 128;
+  const [canvas, ctx] = makeCanvas(S, S);
+  ctx.clearRect(0, 0, S, S);
+
+  const cx = S * 0.5;
+  const cy = S * 0.5;
+
+  const drawWaveRing = (r: number, width: number, alpha: number) => {
+    const g = ctx.createRadialGradient(cx, cy, Math.max(1, r - width), cx, cy, r + width);
+    g.addColorStop(0, 'rgba(214, 234, 250, 0)');
+    g.addColorStop(0.45, `rgba(224, 240, 255, ${alpha})`);
+    g.addColorStop(0.55, `rgba(244, 250, 255, ${alpha * 1.15})`);
+    g.addColorStop(1, 'rgba(214, 234, 250, 0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + width, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  drawWaveRing(S * 0.38, S * 0.065, 0.72);
+  drawWaveRing(S * 0.24, S * 0.045, 0.36);
+
+  return toTexture(canvas, { wrap: false });
+}
+
+/**
+ * Warm damp Hong Kong pocket-park / plaza interlocking brick paver texture for urban zoning.
+ */
+export function createPlazaPaverTexture(): THREE.CanvasTexture {
+  const W = 256;
+  const H = 256;
+  const rand = mulberry32(417);
+  const [canvas, ctx] = makeCanvas(W, H);
+
+  ctx.fillStyle = '#5a626b';
+  ctx.fillRect(0, 0, W, H);
+
+  const bw = 32;
+  const bh = 16;
+  for (let row = 0; row < H / bh; row++) {
+    const y = row * bh;
+    const xOff = (row % 2) * (bw * 0.5);
+    for (let x = -bw; x < W + bw; x += bw) {
+      const tone = rand();
+      ctx.fillStyle =
+        tone < 0.35 ? '#665b5b' : tone < 0.72 ? '#59636d' : '#6c6864';
+      ctx.fillRect(x + xOff + 1, y + 1, bw - 2, bh - 2);
+      ctx.fillStyle = 'rgba(228, 236, 244, 0.08)';
+      ctx.fillRect(x + xOff + 1, y + 1, bw - 2, 2);
+      ctx.strokeStyle = 'rgba(18, 24, 32, 0.36)';
+      ctx.lineWidth = 1.4;
+      ctx.strokeRect(x + xOff + 0.5, y + 0.5, bw - 1, bh - 1);
+    }
+  }
+
+  return toTexture(canvas, { repeatX: 4, repeatY: 4 });
+}
+
+/**
+ * Embossed 1950s Hong Kong Tong Lau Art-Deco parapet date plaque (1958).
+ */
+export function createHeritageDatePlaqueTexture(): THREE.CanvasTexture {
+  const W = 256;
+  const H = 96;
+  const [canvas, ctx] = makeCanvas(W, H);
+
+  ctx.fillStyle = '#8b7a6f';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#cbb9aa';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(6, 6, W - 12, H - 12);
+  ctx.strokeStyle = '#5c4e46';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(13, 13, W - 26, H - 26);
+
+  ctx.fillStyle = '#ece2d6';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  fitFontSize(ctx, '1 9 5 8', 800, 44, 24, HK_SERIF, W - 44);
+  ctx.fillText('1 9 5 8', W * 0.5, H * 0.54);
+
+  return toTexture(canvas, { wrap: false });
+}
+

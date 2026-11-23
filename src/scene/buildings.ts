@@ -5,14 +5,16 @@ import {
   createContactShadowTexture,
   createCorrugatedTinTexture,
   createFacadeTextureSet,
+  createHeritageDatePlaqueTexture,
   createLouvreVentTexture,
+  createMtrExitSignTexture,
   createNeonSignTexture,
   createPawnshopNeonTexture,
   createRoofTileTexture,
   createSafetyNetTexture,
   createShopInteriorTexture,
   createTileDadoTexture,
-  createVendingMachineTexture
+  createVendingMachineTextureSet
 } from './textures';
 
 export interface BuildingsSystem {
@@ -1160,93 +1162,198 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     addDrainagePipeRun(b1, cx - W * 0.5 - 0.06, cz + D * 0.5 + 0.04, Y0 + arcadeH + upperH + 0.08, Y0, [0, 1], true);
     addDrainagePipeRun(b1, cx + W * 0.5 + 0.06, cz - D * 0.5 + 0.12, Y0 + arcadeH + upperH + 0.08, Y0, [1, 0], false);
 
-    // Pitched slate roof + raised clay hip ridges + dormer vent + steel rain gutters + raised tank
+    // Authentic 1950s Hong Kong Curved Tong Lau Art-Deco Parapet Roof Terrace (弧角唐樓天台)
+    const roofBaseY = Y0 + arcadeH + upperH + 0.14;
+    const roofDeck = new THREE.Mesh(new THREE.BoxGeometry(W - 0.14, 0.10, D - 0.14), roofFlatMat);
+    roofDeck.position.set(cx, roofBaseY, cz);
+    roofDeck.receiveShadow = true;
+    b1.add(roofDeck);
+
+    // Molded perimeter parapet wall wrapping the straight sides & curved SE corner
+    const pH = 0.78;
+    const pT = 0.24;
+    const b1ParapetSpecs: Array<[number, number, number, number]> = [
+      [cx - 0.34, cz + D * 0.5 - pT * 0.5, W - 0.68, pT],
+      [cx, cz - D * 0.5 + pT * 0.5, W, pT],
+      [cx + W * 0.5 - pT * 0.5, cz - 0.34, pT, D - 0.68],
+      [cx - W * 0.5 + pT * 0.5, cz, pT, D]
+    ];
+    for (const [px, pz, pw, pd] of b1ParapetSpecs) {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(pw, pH, pd), warmConcreteMat);
+      p.position.set(px, roofBaseY + pH * 0.5, pz);
+      p.castShadow = true;
+      p.receiveShadow = true;
+      b1.add(p);
+
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(pw + 0.08, 0.08, pd + 0.08), corniceMat);
+      cap.position.set(px, roofBaseY + pH + 0.04, pz);
+      b1.add(cap);
+    }
+
+    // Elevated Streamline Moderne Curved Corner Pediment + Embossed Heritage '1958' Plaque!
+    const curvedParapet = new THREE.Mesh(
+      new THREE.CylinderGeometry(curveRadius + 0.02, curveRadius + 0.02, pH + 0.34, 16, 1, false, 0, Math.PI * 0.5),
+      corniceMat
+    );
+    curvedParapet.position.set(curveCX, roofBaseY + (pH + 0.34) * 0.5, curveCZ);
+    curvedParapet.castShadow = true;
+    b1.add(curvedParapet);
+
+    const curvedCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(curveRadius + 0.10, curveRadius + 0.10, 0.10, 16, 1, false, 0, Math.PI * 0.5),
+      corniceMat
+    );
+    curvedCap.position.set(curveCX, roofBaseY + pH + 0.38, curveCZ);
+    b1.add(curvedCap);
+
+    // Embossed '1958' plaque angled cleanly across the curved corner pediment facing SE camera!
+    const plaqueMat1958 = new THREE.MeshStandardMaterial({
+      map: createHeritageDatePlaqueTexture(),
+      roughness: 0.68,
+      metalness: 0.06
+    });
+    const datePlaque = new THREE.Mesh(
+      new THREE.BoxGeometry(0.96, 0.36, 0.06),
+      [corniceMat, corniceMat, corniceMat, corniceMat, plaqueMat1958, corniceMat]
+    );
+    datePlaque.position.set(curveCX + 0.58, roofBaseY + pH + 0.08, curveCZ + 0.58);
+    datePlaque.rotation.y = Math.PI * 0.25;
+    b1.add(datePlaque);
+
+    // Tiled Rooftop Stair Bulkhead (天台樓梯屋) with pitched slate-tile roof & glowing stairwell transom!
     const pitchedRoofMat = new THREE.MeshStandardMaterial({
       map: darkRoofTileTex,
       roughness: 0.72,
       metalness: 0.12
     });
-    const roofBaseY = Y0 + arcadeH + upperH + 0.16;
-    const roofH = 1.35;
-    const roofMain = new THREE.Mesh(new THREE.ConeGeometry(4.35, roofH, 4), pitchedRoofMat);
-    roofMain.rotation.y = Math.PI * 0.25;
-    roofMain.scale.set(1.06, 1.0, 0.92);
-    roofMain.position.set(cx, roofBaseY + roofH * 0.5, cz);
-    roofMain.castShadow = true;
-    b1.add(roofMain);
+    const stairX = cx - 1.35;
+    const stairZ = cz - 1.05;
+    const stairBody = new THREE.Mesh(new THREE.BoxGeometry(2.15, 1.48, 1.95), warmConcreteMat);
+    stairBody.position.set(stairX, roofBaseY + 0.74, stairZ);
+    stairBody.castShadow = true;
+    b1.add(stairBody);
 
-    // Raised clay hip ridge cap tiles along the 4 diagonal roof hips + apex finial
-    const hipCorners: Array<[number, number]> = [
-      [W * 0.5 + 0.04, D * 0.5 + 0.02],
-      [-W * 0.5 - 0.04, D * 0.5 + 0.02],
-      [W * 0.5 + 0.04, -D * 0.5 - 0.02],
-      [-W * 0.5 - 0.04, -D * 0.5 - 0.02]
-    ];
-    for (const [hx, hz] of hipCorners) {
-      const p0 = new THREE.Vector3(cx + hx, roofBaseY + 0.04, cz + hz);
-      const p1 = new THREE.Vector3(cx, roofBaseY + roofH + 0.04, cz);
-      const dir = p1.clone().sub(p0);
-      const len = dir.length();
-      const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.11, len), clayRidgeMat);
-      ridge.position.copy(p0).lerp(p1, 0.5);
-      ridge.lookAt(p1);
-      b1.add(ridge);
-    }
-    const apexCap = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.14, 0.28), clayRidgeMat);
-    apexCap.position.set(cx, roofBaseY + roofH + 0.06, cz);
-    b1.add(apexCap);
+    const stairRoof = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.12, 2.24), pitchedRoofMat);
+    stairRoof.position.set(stairX, roofBaseY + 1.54, stairZ);
+    stairRoof.rotation.x = 0.12;
+    stairRoof.castShadow = true;
+    b1.add(stairRoof);
 
-    // Perimeter dark-steel eaves rain gutters
-    const gutterSpecs: Array<[number, number, number, number]> = [
-      [cx, cz + D * 0.5 + 0.18, W + 0.42, 0.11],
-      [cx, cz - D * 0.5 - 0.18, W + 0.42, 0.11],
-      [cx + W * 0.5 + 0.18, cz, 0.11, D + 0.42],
-      [cx - W * 0.5 - 0.18, cz, 0.11, D + 0.42]
-    ];
-    for (const [gx, gz, gw, gd] of gutterSpecs) {
-      const gut = new THREE.Mesh(new THREE.BoxGeometry(gw, 0.09, gd), darkSteelMat);
-      gut.position.set(gx, roofBaseY - 0.02, gz);
-      markTiny(gut);
-      b1.add(gut);
-    }
+    const stairDoorB1 = new THREE.Mesh(new THREE.BoxGeometry(0.68, 1.12, 0.06), darkSteelMat);
+    stairDoorB1.position.set(stairX + 0.35, roofBaseY + 0.58, stairZ + 0.99);
+    markTiny(stairDoorB1);
+    b1.add(stairDoorB1);
 
-    // 3D Roof Dormer Louver Vent on south slope
-    const dormer = new THREE.Group();
-    const dormerBox = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.42, 0.62), warmConcreteMat);
-    dormer.add(dormerBox);
-    const dormerRoof = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.08, 0.78), clayRidgeMat);
-    dormerRoof.position.set(0, 0.24, 0.04);
-    dormerRoof.rotation.x = 0.18;
-    dormer.add(dormerRoof);
-    const dormerVent = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.24, 0.04), louvreMat);
-    dormerVent.position.set(0, 0, 0.31);
-    dormer.add(dormerVent);
-    dormer.position.set(cx, roofBaseY + 0.54, cz + 1.45);
-    b1.add(dormer);
+    const stairTransomMat = new THREE.MeshStandardMaterial({
+      color: 0xffdf9a,
+      emissive: new THREE.Color(0xffa63e),
+      emissiveIntensity: 1.25,
+      roughness: 0.35
+    });
+    emissiveTracks.push({ mat: stairTransomMat, baseIntensity: 1.25 });
+    const stairTransom = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.20, 0.06), stairTransomMat);
+    stairTransom.position.set(stairX + 0.35, roofBaseY + 1.26, stairZ + 0.99);
+    markTiny(stairTransom);
+    b1.add(stairTransom);
 
-    // Rooftop galvanized water tank raised on steel legs with inspection hatch & feed pipe
-    const tankGrp = new THREE.Group();
-    tankGrp.position.set(cx - 1.95, roofBaseY + 0.25, cz - 1.65);
-    for (const [lx, lz] of [
-      [-0.28, -0.28],
-      [0.28, -0.28],
-      [-0.28, 0.28],
-      [0.28, 0.28]
+    // Corrugated tin rooftop garden canopy + potted terracotta rooftop plants & clothesline
+    const terraceShade = new THREE.Mesh(
+      new THREE.BoxGeometry(2.05, 0.06, 1.55),
+      new THREE.MeshStandardMaterial({ map: greenCanopyTex, roughness: 0.68, metalness: 0.22 })
+    );
+    terraceShade.position.set(cx + 1.35, roofBaseY + 1.28, cz - 1.35);
+    terraceShade.rotation.z = -0.14;
+    terraceShade.castShadow = true;
+    b1.add(terraceShade);
+    for (const [px, pz] of [
+      [cx + 0.48, cz - 0.68],
+      [cx + 2.22, cz - 0.68],
+      [cx + 2.22, cz - 2.02]
     ]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.44, 0.06), darkSteelMat);
-      leg.position.set(lx, 0.16, lz);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.24, 6), darkSteelMat);
+      post.position.set(px, roofBaseY + 0.62, pz);
+      markTiny(post);
+      b1.add(post);
+    }
+
+    const roofPlantMat = new THREE.MeshStandardMaterial({ color: 0x356448, roughness: 0.94 });
+    const roofPotMat = new THREE.MeshStandardMaterial({ color: 0x9c523a, roughness: 0.85 });
+    for (const [px, pz] of [
+      [cx + 1.65, cz + 1.35],
+      [cx + 0.95, cz + 1.55],
+      [cx - 0.20, cz + 1.60]
+    ]) {
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, 0.28, 8), roofPotMat);
+      pot.position.set(px, roofBaseY + 0.14, pz);
+      b1.add(pot);
+      const shrub = new THREE.Mesh(new THREE.DodecahedronGeometry(0.24, 0), roofPlantMat);
+      shrub.position.set(px, roofBaseY + 0.36, pz);
+      markTiny(shrub);
+      b1.add(shrub);
+    }
+
+    // Rooftop galvanized water tank raised on steel legs on open west-south terrace corner
+    const tankGrp = new THREE.Group();
+    tankGrp.position.set(cx - 1.75, roofBaseY + 0.06, cz + 1.25);
+    for (const [lx, lz] of [
+      [-0.26, -0.26],
+      [0.26, -0.26],
+      [-0.26, 0.26],
+      [0.26, 0.26]
+    ]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.40, 0.055), darkSteelMat);
+      leg.position.set(lx, 0.20, lz);
       markTiny(leg);
       tankGrp.add(leg);
     }
-    const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.92, 14), tankSteelMat);
-    tank.position.y = 0.80;
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.86, 14), tankSteelMat);
+    tank.position.y = 0.82;
     tank.castShadow = true;
     tankGrp.add(tank);
-    const hatch = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.06, 10), darkSteelMat);
-    hatch.position.set(0.14, 1.28, 0.10);
+    const hatch = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.06, 10), darkSteelMat);
+    hatch.position.set(0.12, 1.27, 0.09);
     markTiny(hatch);
     tankGrp.add(hatch);
     b1.add(tankGrp);
+
+    // Enriched Narrow HK Back-Alley Micro-Life (後巷) between B1 (z=4.0) & B2 (z=2.2)
+    {
+      const alleyGrp = new THREE.Group();
+      const alleyZ = cz - D * 0.5 - 0.85; // z ≈ 3.15
+      // Overhead bare-bulb alleyway wire & warm tungsten bulb bridging B1 and B2
+      const alleyWire = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 1.85, 5), darkSteelMat);
+      alleyWire.rotation.x = Math.PI / 2;
+      alleyWire.position.set(eastX - 0.55, Y0 + 2.85, alleyZ);
+      alleyGrp.add(alleyWire);
+      const alleyShade = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.09, 10), enamelShadeMat);
+      alleyShade.position.set(eastX - 0.55, Y0 + 2.74, alleyZ);
+      alleyGrp.add(alleyShade);
+      const alleyBulb = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 6), cctBulbMat);
+      alleyBulb.position.set(eastX - 0.55, Y0 + 2.67, alleyZ);
+      alleyGrp.add(alleyBulb);
+
+      // Wall-mounted cast-iron HK water-meter bank & conduit box on B1 north cheek wall
+      const meterBox = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.58, 0.14), transformerBoxMat);
+      meterBox.position.set(eastX - 1.15, Y0 + 1.45, cz - D * 0.5 - 0.07);
+      alleyGrp.add(meterBox);
+      for (let mp = 0; mp < 4; mp++) {
+        const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 1.15, 6), copperPipeMat);
+        pipe.position.set(eastX - 1.38 + mp * 0.14, Y0 + 0.62, cz - D * 0.5 - 0.08);
+        alleyGrp.add(pipe);
+      }
+
+      // Stacked blue plastic kitchen delivery crates tucked into the alley shadow
+      const alleyCrateMat = new THREE.MeshStandardMaterial({ color: 0x2662a4, roughness: 0.48 });
+      for (let st = 0; st < 2; st++) {
+        const crate = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.30, 0.36), alleyCrateMat);
+        crate.position.set(eastX - 0.52, Y0 + 0.15 + st * 0.30, cz - D * 0.5 - 0.24);
+        crate.rotation.y = st * 0.08;
+        crate.castShadow = true;
+        alleyGrp.add(crate);
+      }
+      markTiny(alleyGrp);
+      b1.add(alleyGrp);
+    }
 
     // Detailed Box AC units on B1 facades (relative to new cx/cz)
     addBoxAC(b1, eastX + 0.18, Y0 + 4.0, cz - 1.5, Math.PI / 2);
@@ -1565,34 +1672,48 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     // Cast-iron exterior drainage stack on B2 north-east corner
     addDrainagePipeRun(b2, cx + W * 0.5 + 0.05, cz - D * 0.5 + 0.06, Y0 + gfH + upperH, Y0, [1, 0], false);
 
-    // Pitched Wan Chai tiled hip roof + clay hip ridges + eaves gutters
+    // Authentic Wan Chai horizontal-ridge Chinese pitched tiled gable roof (金字瓦頂)
     const b2RoofMat = new THREE.MeshStandardMaterial({
       map: blueRoofTileTex,
       roughness: 0.70,
-      metalness: 0.1
+      metalness: 0.10
     });
     const b2RoofBaseY = Y0 + gfH + upperH;
-    const b2RoofH = 1.25;
-    const b2Roof = new THREE.Mesh(new THREE.ConeGeometry(3.85, b2RoofH, 4), b2RoofMat);
-    b2Roof.rotation.y = Math.PI * 0.25;
-    b2Roof.scale.set(1.18, 1.0, 0.72);
-    b2Roof.position.set(cx, b2RoofBaseY + b2RoofH * 0.5, cz);
+    const b2RoofH = 1.18;
+    const gableShape = new THREE.Shape();
+    gableShape.moveTo(-D * 0.5 - 0.14, 0);
+    gableShape.lineTo(D * 0.5 + 0.14, 0);
+    gableShape.lineTo(0, b2RoofH);
+    gableShape.closePath();
+
+    const b2GableGeom = new THREE.ExtrudeGeometry(gableShape, {
+      depth: W + 0.24,
+      bevelEnabled: false
+    });
+    b2GableGeom.rotateY(Math.PI / 2);
+    b2GableGeom.translate(-(W + 0.24) * 0.5, 0, 0);
+
+    const b2Roof = new THREE.Mesh(b2GableGeom, [b2TrimMat, b2RoofMat]);
+    b2Roof.position.set(cx, b2RoofBaseY, cz);
     b2Roof.castShadow = true;
+    b2Roof.receiveShadow = true;
     b2.add(b2Roof);
 
-    for (const [hx, hz] of [
-      [W * 0.5, D * 0.5],
-      [-W * 0.5, D * 0.5],
-      [W * 0.5, -D * 0.5],
-      [-W * 0.5, -D * 0.5]
-    ]) {
-      const p0 = new THREE.Vector3(cx + hx, b2RoofBaseY + 0.04, cz + hz);
-      const p1 = new THREE.Vector3(cx, b2RoofBaseY + b2RoofH + 0.03, cz);
-      const len = p1.distanceTo(p0);
-      const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.10, len), clayRidgeMat);
-      ridge.position.copy(p0).lerp(p1, 0.5);
-      ridge.lookAt(p1);
-      b2.add(ridge);
+    // Ornate horizontal clay ridge beam + end finials along X
+    const mainRidge = new THREE.Mesh(new THREE.BoxGeometry(W + 0.34, 0.16, 0.18), clayRidgeMat);
+    mainRidge.position.set(cx, b2RoofBaseY + b2RoofH + 0.05, cz);
+    b2.add(mainRidge);
+    for (const rx of [cx - W * 0.5 - 0.12, cx + W * 0.5 + 0.12]) {
+      const finial = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.24, 0.22), clayRidgeMat);
+      finial.position.set(rx, b2RoofBaseY + b2RoofH + 0.10, cz);
+      b2.add(finial);
+    }
+    // Dark-steel eaves rain gutters along north & south slopes
+    for (const sz of [cz - D * 0.5 - 0.16, cz + D * 0.5 + 0.16]) {
+      const gutter = new THREE.Mesh(new THREE.BoxGeometry(W + 0.30, 0.08, 0.10), darkSteelMat);
+      gutter.position.set(cx, b2RoofBaseY - 0.02, sz);
+      markTiny(gutter);
+      b2.add(gutter);
     }
 
     // 3. Upgraded Authentic Hong Kong BAMBOO SCAFFOLDING (竹棚) with X-braces, Instanced nylon knots & planks!
@@ -1765,28 +1886,28 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
 
     const b3Tex = createFacadeTextureSet({
       seed: 303,
-      baseColor: '#566b82',
-      secondaryColor: '#3f5164',
-      trimColor: '#768ca2',
+      baseColor: '#6d8399',
+      secondaryColor: '#506478',
+      trimColor: '#8ea4b8',
       cols: 3,
       rows: 4,
       tileStyle: 'concrete',
-      litProbability: 0.54,
-      warmRatio: 0.72,
+      litProbability: 0.58,
+      warmRatio: 0.76,
       hasIronGrilles: false,
-      stainStrength: 1.28
+      stainStrength: 1.12
     });
     const b3WallMat = new THREE.MeshStandardMaterial({
       map: b3Tex.map,
       emissive: new THREE.Color(0xffce84),
       emissiveMap: b3Tex.emissiveMap,
-      emissiveIntensity: 0.74,
+      emissiveIntensity: 0.78,
       bumpMap: b3Tex.bumpMap,
       bumpScale: 0.05,
-      roughness: 0.86,
+      roughness: 0.84,
       metalness: 0.05
     });
-    emissiveTracks.push({ mat: b3WallMat, baseIntensity: 0.74 });
+    emissiveTracks.push({ mat: b3WallMat, baseIntensity: 0.78 });
 
     const tower = new THREE.Mesh(
       new THREE.BoxGeometry(W, H, D),
@@ -2184,6 +2305,40 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       flickerPhase: 0.4
     });
 
+    // Warm-lit ground-floor Kowloon residential stairwell lobby (香港大廈大堂) with dark-bronze mullioned double doors
+    const b3LobbyMat = new THREE.MeshStandardMaterial({
+      color: 0xe8bc7a,
+      emissive: new THREE.Color(0xe8943a),
+      emissiveIntensity: 0.62,
+      roughness: 0.48
+    });
+    emissiveTracks.push({ mat: b3LobbyMat, baseIntensity: 0.62 });
+    const lobbyX = cx + 1.25;
+    const lobbyGlass = new THREE.Mesh(new THREE.BoxGeometry(1.18, 2.02, 0.06), b3LobbyMat);
+    lobbyGlass.position.set(lobbyX, Y0 + 1.04, southZ + 0.01);
+    b3.add(lobbyGlass);
+    // Mullioned bronze/steel lobby doorway framing + double-door divider + transom + kick plate
+    for (const dx of [-0.60, 0, 0.60]) {
+      const mull = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.08, 0.11), darkSteelMat);
+      mull.position.set(lobbyX + dx, Y0 + 1.04, southZ + 0.03);
+      markTiny(mull);
+      b3.add(mull);
+    }
+    for (const [my, mh] of [
+      [0.24, 0.44],
+      [1.62, 0.06],
+      [2.06, 0.08]
+    ]) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(1.26, mh, 0.11), darkSteelMat);
+      bar.position.set(lobbyX, Y0 + my, southZ + 0.03);
+      markTiny(bar);
+      b3.add(bar);
+    }
+    const lobbyCanopy = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.14, 0.66), coolConcreteMat);
+    lobbyCanopy.position.set(lobbyX, Y0 + 2.20, southZ + 0.30);
+    lobbyCanopy.castShadow = true;
+    b3.add(lobbyCanopy);
+
     addBoxAC(b3, eastX + 0.18, Y0 + 5.8, cz - 1.1, Math.PI / 2);
     addBoxAC(b3, eastX + 0.18, Y0 + 8.6, cz - 0.6, Math.PI / 2);
     addBoxAC(b3, cx + 1.6, Y0 + 8.7, southZ + 0.18, 0);
@@ -2192,8 +2347,143 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
   }
 
   // =========================================================================
+  // B6: Back-West Companion Ochre Tenement (永安樓 — stepped companion beside B3!)
+  // Footprint: x in [-16.6, -11.9], z in [-12.2, -7.2], height = 8.6m
+  // Turns B3 from an isolated pillar into a cohesive layered Kowloon urban block!
+  // =========================================================================
+  {
+    const b6 = new THREE.Group();
+    b6.name = 'B6_BackWestTongLau';
+    const cx = -14.25;
+    const cz = -9.7;
+    const W = 4.7;
+    const D = 5.0;
+    const H = 8.6;
+    const eastX = cx + W * 0.5;
+    const southZ = cz + D * 0.5;
+    addContactShadow(cx, cz, W, D, 0.64);
+
+    const b6Tex = createFacadeTextureSet({
+      seed: 606,
+      baseColor: '#8d7b6b',
+      secondaryColor: '#69594d',
+      trimColor: '#afa092',
+      cols: 2,
+      rows: 3,
+      tileStyle: 'plaster',
+      litProbability: 0.60,
+      warmRatio: 0.80,
+      hasIronGrilles: true,
+      stainStrength: 1.08
+    });
+    const b6WallMat = new THREE.MeshStandardMaterial({
+      map: b6Tex.map,
+      emissive: new THREE.Color(0xffc97c),
+      emissiveMap: b6Tex.emissiveMap,
+      emissiveIntensity: 0.72,
+      bumpMap: b6Tex.bumpMap,
+      bumpScale: 0.045,
+      roughness: 0.84,
+      metalness: 0.04
+    });
+    emissiveTracks.push({ mat: b6WallMat, baseIntensity: 0.72 });
+
+    const b6TrimMat = new THREE.MeshStandardMaterial({ color: 0xa49486, roughness: 0.80 });
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(W, H, D),
+      [b6WallMat, b6WallMat, roofFlatMat, roofFlatMat, b6WallMat, b6WallMat]
+    );
+    body.position.set(cx, Y0 + H * 0.5, cz);
+    body.castShadow = true;
+    body.receiveShadow = true;
+    b6.add(body);
+
+    // Horizontal concrete sun-hood stringcourses
+    for (let fl = 1; fl <= 2; fl++) {
+      const fy = Y0 + fl * (H / 3);
+      const band = new THREE.Mesh(new THREE.BoxGeometry(W + 0.22, 0.14, D + 0.22), b6TrimMat);
+      band.position.set(cx, fy, cz);
+      b6.add(band);
+    }
+
+    // 3D Window Sun-Hoods, Sills & Wrought-Iron Window Cage on B6
+    addFacadeWindowReliefs(b6, {
+      cx,
+      yBot: Y0,
+      cz,
+      W,
+      H,
+      D,
+      cols: 2,
+      rows: 3,
+      faces: ['+Z', '+X'],
+      hoodMat: b6TrimMat,
+      cages: [{ face: '+Z', col: 1, row: 0, hasPlant: true }]
+    });
+
+    // Rooftop parapet, tin penthouse & water tank on B6
+    const roofY = Y0 + H;
+    for (const [px, pz, pw, pd] of [
+      [cx, cz + D * 0.5 - 0.12, W, 0.24],
+      [cx, cz - D * 0.5 + 0.12, W, 0.24],
+      [cx + W * 0.5 - 0.12, cz, 0.24, D],
+      [cx - W * 0.5 + 0.12, cz, 0.24, D]
+    ] as Array<[number, number, number, number]>) {
+      const pm = new THREE.Mesh(new THREE.BoxGeometry(pw, 0.56, pd), b6TrimMat);
+      pm.position.set(px, roofY + 0.28, pz);
+      pm.castShadow = true;
+      b6.add(pm);
+    }
+
+    const b6Hut = new THREE.Mesh(
+      new THREE.BoxGeometry(2.1, 1.25, 1.9),
+      new THREE.MeshStandardMaterial({ map: tinPenthouseTex, roughness: 0.70, metalness: 0.30 })
+    );
+    b6Hut.position.set(cx - 0.65, roofY + 0.625, cz - 0.85);
+    b6Hut.castShadow = true;
+    b6.add(b6Hut);
+
+    const b6Tank = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.86, 12), tankSteelMat);
+    b6Tank.position.set(cx + 1.15, roofY + 0.56, cz - 1.05);
+    b6Tank.castShadow = true;
+    b6.add(b6Tank);
+
+    // Classic projecting Kowloon emerald-rose vertical neon sign: 賓館 HOSTEL peeking cleanly above viaduct!
+    const hostelTex = createNeonSignTexture({
+      text: '賓館',
+      subText: 'HOSTEL',
+      vertical: true,
+      bgColor: '#2a1624',
+      borderColor: '#ff8a9e',
+      textColor: '#fff0f2',
+      glowColor: '#ff5276',
+      width: 196,
+      height: 512
+    });
+    addProjectingNeon(b6, hostelTex, {
+      x: cx + 1.05,
+      y: Y0 + 7.95,
+      z: southZ + 0.54,
+      width: 0.68,
+      height: 1.78,
+      rotY: Math.PI / 2,
+      bracketDir: [0, -1],
+      bracketLen: 0.20,
+      emissiveHex: 0xff6284,
+      baseIntensity: 1.44,
+      flickerPhase: 1.9
+    });
+
+    addBoxAC(b6, cx - 0.95, Y0 + 7.0, southZ + 0.18, 0);
+    addBoxAC(b6, eastX + 0.18, Y0 + 7.1, cz + 0.9, Math.PI / 2);
+
+    group.add(b6);
+  }
+
+  // =========================================================================
   // B4: Far-Right Jade-Green Mosaic Shophouse behind Viaduct (紙皮石唐樓 + 3D 便利店 24H!)
   // Footprint: x in [+12.4, +18.4], z in [-12.4, -6.8], cleanly north of viaduct!
+  // Elevated to 3 upper storeys (upperH = 7.5) so roofline & neon signs crown proudly above viaduct!
   // =========================================================================
   {
     const b4 = new THREE.Group();
@@ -2203,7 +2493,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     const W = 6.0;
     const D = 5.6;
     const gfH = 2.8;
-    const upperH = 6.0;
+    const upperH = 7.5;
     addContactShadow(cx, cz, W, D, 0.66);
 
     // -----------------------------------------------------------------------
@@ -2726,7 +3016,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     }
 
     // -----------------------------------------------------------------------
-    // 2. Upper Jade-Green Mosaic Tile Facade (紙皮石唐樓) + 3D Relief
+    // 2. Upper Jade-Green Mosaic Tile Facade (紙皮石唐樓 — 3 upper storeys clearing viaduct!)
     // -----------------------------------------------------------------------
     const b4Tex = createFacadeTextureSet({
       seed: 404,
@@ -2734,10 +3024,10 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       secondaryColor: '#365652',
       trimColor: '#769a94',
       cols: 3,
-      rows: 2,
+      rows: 3,
       tileStyle: 'mosaic',
-      litProbability: 0.6,
-      warmRatio: 0.75,
+      litProbability: 0.62,
+      warmRatio: 0.76,
       hasIronGrilles: true,
       stainStrength: 1.0
     });
@@ -2745,13 +3035,13 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       map: b4Tex.map,
       emissive: new THREE.Color(0xffcc82),
       emissiveMap: b4Tex.emissiveMap,
-      emissiveIntensity: 0.70,
+      emissiveIntensity: 0.72,
       bumpMap: b4Tex.bumpMap,
       bumpScale: 0.048,
       roughness: 0.72,
       metalness: 0.08
     });
-    emissiveTracks.push({ mat: b4WallMat, baseIntensity: 0.70 });
+    emissiveTracks.push({ mat: b4WallMat, baseIntensity: 0.72 });
 
     const upperBody = new THREE.Mesh(
       new THREE.BoxGeometry(W, upperH, D),
@@ -2763,7 +3053,12 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     b4.add(upperBody);
 
     // Horizontal jade concrete stringcourses & angled corner pilasters
-    for (const fy of [Y0 + gfH + 0.04, Y0 + gfH + upperH * 0.5, Y0 + gfH + upperH - 0.04]) {
+    for (const fy of [
+      Y0 + gfH + 0.04,
+      Y0 + gfH + upperH / 3,
+      Y0 + gfH + (upperH * 2) / 3,
+      Y0 + gfH + upperH - 0.04
+    ]) {
       const band = new THREE.Mesh(new THREE.BoxGeometry(W + 0.24, 0.16, D + 0.24), jadeTrimMat);
       band.position.set(cx, fy, cz);
       b4.add(band);
@@ -2789,14 +3084,14 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       H: upperH,
       D,
       cols: 3,
-      rows: 2,
+      rows: 3,
       faces: ['+Z', '+X', '-X'],
       hoodMat: jadeTrimMat,
       cages: [
         { face: '+Z', col: 2, row: 0, hasPlant: true },
         { face: '+X', col: 0, row: 1, hasPlant: false }
       ],
-      laundryPoles: [{ face: '+X', col: 0, row: 0, phase: 4.2 }]
+      laundryPoles: [{ face: '+X', col: 1, row: 0, phase: 4.2 }]
     });
 
     // Cast-iron exterior drainage pipes on B4 corners
@@ -2865,11 +3160,12 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       ] as Array<[number, number, number, number, boolean]>) {
         const puff = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), light ? bushLightMat : bushDarkMat);
         puff.position.set(bx + ox, roofY + oy, bz + oz);
+        markTiny(puff);
         b4.add(puff);
       }
     }
 
-    // Projecting vertical Hong Kong neon signs on B4: 涼茶 (0.68 × 1.78, AR 0.382) & 藥房 (0.74 × 1.92, AR 0.385)
+    // Projecting vertical Hong Kong neon signs on B4 elevated cleanly ABOVE viaduct deck!
     const teaTex = createNeonSignTexture({
       text: '涼茶',
       subText: 'HERBAL TEA',
@@ -2883,7 +3179,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     });
     addProjectingNeon(b4, teaTex, {
       x: cx - W * 0.5 - 0.52,
-      y: Y0 + 5.5,
+      y: Y0 + 8.15,
       z: cz + 1.25,
       width: 0.68,
       height: 1.78,
@@ -2907,8 +3203,8 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       height: 512
     });
     addProjectingNeon(b4, pharmTex, {
-      x: cx - 1.15,
-      y: Y0 + 6.2,
+      x: cx - 1.05,
+      y: Y0 + 8.65,
       z: cz + D * 0.5 + 0.56,
       width: 0.74,
       height: 1.92,
@@ -2922,76 +3218,239 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
 
     // AC units on B4
     addBoxAC(b4, cx + W * 0.5 + 0.18, Y0 + 4.4, cz + 1.15, Math.PI / 2);
-    addBoxAC(b4, cx + W * 0.5 + 0.18, Y0 + 7.1, cz - 1.05, Math.PI / 2);
-    addBoxAC(b4, cx + 1.15, Y0 + 4.5, cz + D * 0.5 + 0.18, 0);
+    addBoxAC(b4, cx + W * 0.5 + 0.18, Y0 + 7.2, cz - 1.05, Math.PI / 2);
+    addBoxAC(b4, cx + 1.15, Y0 + 8.2, cz + D * 0.5 + 0.18, 0);
 
     group.add(b4);
   }
 
   // =========================================================================
-  // STANDALONE EAST PLAZA LUMINOUS OUTDOOR ICY-CYAN VENDING MACHINES
-  // Separated cleanly onto the airy east foreground sidewalk corner at (7.0, 2.5) & (8.15, 2.5),
-  // facing +Z toward the camera & wet zebra crossing — echoing IMG_1635!
+  // EAST PLAZA ARCHITECTURAL ANCHOR: HONG KONG MTR / SUBWAY EXIT A3 CANOPY
+  // (灣仔站 A3 出口) + SHELTERED VENDING MACHINE NICHE (x in [6.45, 13.55], z in [0.1, 2.2])
+  // Low-profile (~3.1m) so sightlines to viaduct, train, and B4 remain 100% open!
   // =========================================================================
   {
-    const vendingGroup = new THREE.Group();
-    vendingGroup.name = 'EastPlaza_OutdoorVendingMachines';
+    const mtrGroup = new THREE.Group();
+    mtrGroup.name = 'EastPlaza_MtrExitA3_AndVending';
 
-    const vmTexA = createVendingMachineTexture('cyan');
-    const vmTexB = createVendingMachineTexture('white');
-    const vmSideMat = new THREE.MeshStandardMaterial({ color: 0xcbe0ea, roughness: 0.42, metalness: 0.24 });
-    const vmDarkInteriorMat = new THREE.MeshStandardMaterial({ color: 0x101c26, roughness: 0.85 });
-    const octopusPadMat = new THREE.MeshStandardMaterial({
-      color: 0xf8c042,
-      emissive: new THREE.Color(0xe89c22),
-      emissiveIntensity: 0.85,
+    const mtrGreenSteelMat = new THREE.MeshStandardMaterial({
+      color: 0x1c4a3e,
+      roughness: 0.44,
+      metalness: 0.52
+    });
+    const mtrCanopyGlassMat = new THREE.MeshStandardMaterial({
+      color: 0x98d8e6,
+      transparent: true,
+      opacity: 0.36,
+      roughness: 0.16,
+      metalness: 0.26
+    });
+    const mtrTileWallMat = new THREE.MeshStandardMaterial({
+      map: tileDadoTex,
+      color: 0xc2d8d0,
+      roughness: 0.40,
+      metalness: 0.08
+    });
+    const mtrStairMat = new THREE.MeshStandardMaterial({
+      color: 0x4b5660,
+      roughness: 0.82
+    });
+    const mtrGlowCeilingMat = new THREE.MeshStandardMaterial({
+      color: 0xf4e4c4,
+      emissive: new THREE.Color(0xf2cb88),
+      emissiveIntensity: 0.68,
+      roughness: 0.52
+    });
+    emissiveTracks.push({ mat: mtrGlowCeilingMat, baseIntensity: 0.68 });
+
+    const mtrSignSet = createMtrExitSignTexture();
+    const mtrSignMat = new THREE.MeshStandardMaterial({
+      map: mtrSignSet.map,
+      emissive: new THREE.Color(0xe6fff8),
+      emissiveMap: mtrSignSet.emissiveMap,
+      emissiveIntensity: 1.02,
       roughness: 0.32
     });
-    emissiveTracks.push({ mat: octopusPadMat, baseIntensity: 0.85 });
+    emissiveTracks.push({ mat: mtrSignMat, baseIntensity: 1.02 });
 
-    const vmSpecs: Array<{ x: number; z: number; tex: THREE.CanvasTexture; emissive: number }> = [
-      { x: 7.0, z: 2.5, tex: vmTexA, emissive: 0x74eaff },
-      { x: 8.15, z: 2.5, tex: vmTexB, emissive: 0x9cf0ff }
+    // Contact AO beneath the full MTR exit & vending shelter structure
+    addContactShadow(10.0, 1.15, 7.2, 2.25, 0.56);
+
+    // 1. East Wing: Glowing Recessed MTR Subway Stairwell Hood (x in [8.9, 13.5], z in [0.1, 2.15])
+    const sx = 11.2;
+    const sz = 1.12;
+    const sw = 4.6;
+    const sd = 2.02;
+
+    // Glazed jade-tiled stairwell perimeter parapet walls (North, East, West — open South entrance!)
+    const backWallMtr = new THREE.Mesh(new THREE.BoxGeometry(sw, 1.55, 0.18), mtrTileWallMat);
+    backWallMtr.position.set(sx, Y0 + 0.775, sz - sd * 0.5 + 0.09);
+    backWallMtr.castShadow = true;
+    backWallMtr.receiveShadow = true;
+    mtrGroup.add(backWallMtr);
+
+    for (const sideX of [sx - sw * 0.5 + 0.09, sx + sw * 0.5 - 0.09]) {
+      const sideW = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.32, sd), mtrTileWallMat);
+      sideW.position.set(sideX, Y0 + 0.66, sz);
+      sideW.castShadow = true;
+      sideW.receiveShadow = true;
+      mtrGroup.add(sideW);
+
+      const capStone = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, sd + 0.06), coolConcreteMat);
+      capStone.position.set(sideX, Y0 + 1.35, sz);
+      mtrGroup.add(capStone);
+    }
+
+    // Dark recessed subway descent portal floor + stepped concrete stairs + stainless handrails
+    const wellFloor = new THREE.Mesh(
+      new THREE.BoxGeometry(sw - 0.36, 0.06, sd - 0.24),
+      new THREE.MeshStandardMaterial({ color: 0x16222a, roughness: 0.75 })
+    );
+    wellFloor.position.set(sx, Y0 + 0.03, sz + 0.02);
+    mtrGroup.add(wellFloor);
+
+    // Illuminated recessed subway concourse portal glow on inner north wall
+    const portalGlow = new THREE.Mesh(new THREE.PlaneGeometry(sw - 0.80, 1.18), mtrGlowCeilingMat);
+    portalGlow.position.set(sx, Y0 + 0.74, sz - sd * 0.5 + 0.20);
+    mtrGroup.add(portalGlow);
+
+    // 4 Descending concrete steps with yellow anti-slip nosing strips
+    for (let st = 0; st < 4; st++) {
+      const stepH = 0.05 + (3 - st) * 0.035;
+      const step = new THREE.Mesh(new THREE.BoxGeometry(sw - 0.44, stepH, 0.34), mtrStairMat);
+      step.position.set(sx, Y0 + stepH * 0.5, sz + 0.74 - st * 0.36);
+      markTiny(step);
+      mtrGroup.add(step);
+    }
+
+    // Center & side brushed stainless-steel subway handrails
+    for (const rx of [sx - 1.98, sx, sx + 1.98]) {
+      const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1.65, 8), stainlessMat);
+      rail.rotation.x = Math.PI / 2 + 0.14;
+      rail.position.set(rx, Y0 + 0.86, sz + 0.12);
+      markTiny(rail);
+      mtrGroup.add(rail);
+      for (const pz of [sz - 0.55, sz + 0.82]) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.88, 6), stainlessMat);
+        post.position.set(rx, Y0 + 0.44, pz);
+        markTiny(post);
+        mtrGroup.add(post);
+      }
+    }
+
+    // Structural dark-green steel canopy columns (supporting continuous hood over Exit A3 + Vending Niche!)
+    for (const [px, pz] of [
+      [6.55, 1.48],
+      [8.95, 2.02],
+      [13.45, 2.02],
+      [8.95, 0.22],
+      [13.45, 0.22]
+    ]) {
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.076, 2.65, 10), mtrGreenSteelMat);
+      col.position.set(px, Y0 + 1.325, pz);
+      col.castShadow = true;
+      mtrGroup.add(col);
+    }
+
+    // Sloped dark-green framed & glass-skylight MTR canopy roof spanning Exit A3 + Vending Niche
+    const mtrCanopyFrame = new THREE.Mesh(new THREE.BoxGeometry(7.35, 0.12, 2.55), mtrGreenSteelMat);
+    mtrCanopyFrame.position.set(10.0, Y0 + 2.84, 1.18);
+    mtrCanopyFrame.rotation.x = 0.08;
+    mtrCanopyFrame.castShadow = true;
+    mtrGroup.add(mtrCanopyFrame);
+
+    const mtrSkylight = new THREE.Mesh(new THREE.BoxGeometry(6.75, 0.06, 1.92), mtrCanopyGlassMat);
+    mtrSkylight.position.set(10.0, Y0 + 2.90, 1.18);
+    mtrSkylight.rotation.x = 0.08;
+    markTiny(mtrSkylight);
+    mtrGroup.add(mtrSkylight);
+
+    // Warm glowing linear LED soffit light bar underneath the MTR canopy
+    const mtrSoffitBar = new THREE.Mesh(new THREE.BoxGeometry(4.10, 0.05, 0.22), mtrGlowCeilingMat);
+    mtrSoffitBar.position.set(sx, Y0 + 2.68, sz + 0.10);
+    markTiny(mtrSoffitBar);
+    mtrGroup.add(mtrSoffitBar);
+
+    // Iconic Backlit Fascia Signboard facing +Z: 灣仔站 · 出口 WAN CHAI STATION A3 (4.36 × 0.75, exact AR 5.81!)
+    const mtrFascia = new THREE.Mesh(
+      new THREE.BoxGeometry(4.36, 0.75, 0.16),
+      [mtrGreenSteelMat, mtrGreenSteelMat, mtrGreenSteelMat, mtrGreenSteelMat, mtrSignMat, mtrGreenSteelMat]
+    );
+    mtrFascia.position.set(sx, Y0 + 2.48, 2.16);
+    mtrFascia.castShadow = true;
+    mtrGroup.add(mtrFascia);
+
+    // 2. West Wing: Tiled Architectural Backing Wall for the 2 Outdoor Vending Machines!
+    const vmBackWall = new THREE.Mesh(new THREE.BoxGeometry(2.52, 2.38, 0.18), mtrTileWallMat);
+    vmBackWall.position.set(7.65, Y0 + 1.19, 1.48);
+    vmBackWall.castShadow = true;
+    vmBackWall.receiveShadow = true;
+    mtrGroup.add(vmBackWall);
+
+    // 3. Upgraded Non-Blown-Out Crisp Hong Kong Beverage Vending Machines nestled cleanly against the tiled wall!
+    const vmSetA = createVendingMachineTextureSet('teal');
+    const vmSetB = createVendingMachineTextureSet('crimson');
+    const vmTealSideMat = new THREE.MeshStandardMaterial({ color: 0x265264, roughness: 0.44, metalness: 0.30 });
+    const vmCrimSideMat = new THREE.MeshStandardMaterial({ color: 0x8f2e32, roughness: 0.44, metalness: 0.26 });
+    const vmDarkInteriorMat = new THREE.MeshStandardMaterial({ color: 0x101c26, roughness: 0.85 });
+    const octopusPadMat = new THREE.MeshStandardMaterial({
+      color: 0xf4b63c,
+      emissive: new THREE.Color(0xe09420),
+      emissiveIntensity: 0.72,
+      roughness: 0.32
+    });
+    emissiveTracks.push({ mat: octopusPadMat, baseIntensity: 0.72 });
+
+    const vmSpecs: Array<{
+      x: number;
+      z: number;
+      texSet: { map: THREE.CanvasTexture; emissiveMap: THREE.CanvasTexture };
+      sideMat: THREE.MeshStandardMaterial;
+      emissive: number;
+    }> = [
+      { x: 7.05, z: 1.98, texSet: vmSetA, sideMat: vmTealSideMat, emissive: 0x8aeaff },
+      { x: 8.20, z: 1.98, texSet: vmSetB, sideMat: vmCrimSideMat, emissive: 0xaef0ff }
     ];
+
     for (const vm of vmSpecs) {
       const vmGrp = new THREE.Group();
       vmGrp.position.set(vm.x, Y0, vm.z);
 
       const vmFrontMat = new THREE.MeshStandardMaterial({
-        map: vm.tex,
+        map: vm.texSet.map,
         emissive: new THREE.Color(vm.emissive),
-        emissiveMap: vm.tex,
-        emissiveIntensity: 0.86,
-        roughness: 0.26
+        emissiveMap: vm.texSet.emissiveMap,
+        emissiveIntensity: 0.62,
+        roughness: 0.28
       });
-      emissiveTracks.push({ mat: vmFrontMat, baseIntensity: 0.86 });
+      emissiveTracks.push({ mat: vmFrontMat, baseIntensity: 0.62 });
 
-      // Main cabinet body (slightly recessed in front so bezel protrudes cleanly)
+      // Main cabinet body flush against MTR tiled wall
       const body = new THREE.Mesh(
         new THREE.BoxGeometry(0.90, 1.76, 0.66),
-        [vmSideMat, vmSideMat, vmSideMat, vmSideMat, vmFrontMat, vmSideMat]
+        [vm.sideMat, vm.sideMat, vm.sideMat, vm.sideMat, vmFrontMat, vm.sideMat]
       );
       body.position.set(0, 0.94, -0.02);
       body.castShadow = true;
       vmGrp.add(body);
 
-      // 3D Protruding Perimeter Display Bezel Frame creating real physical recess!
-      const bezelTop = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.08, 0.10), vmSideMat);
+      // 3D Protruding Perimeter Display Bezel Frame creating real physical recess
+      const bezelTop = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.08, 0.10), vm.sideMat);
       bezelTop.position.set(0, 1.80, 0.33);
       vmGrp.add(bezelTop);
-      const bezelBot = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.14, 0.10), vmSideMat);
+      const bezelBot = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.14, 0.10), vm.sideMat);
       bezelBot.position.set(0, 0.13, 0.33);
       vmGrp.add(bezelBot);
-      const bezelMid = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.10, 0.10), vmSideMat);
+      const bezelMid = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.10, 0.10), vm.sideMat);
       bezelMid.position.set(0, 0.66, 0.33);
       vmGrp.add(bezelMid);
-      for (const sx of [-0.43, 0.43]) {
-        const sideB = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.76, 0.10), vmSideMat);
-        sideB.position.set(sx, 0.94, 0.33);
+      for (const sxB of [-0.43, 0.43]) {
+        const sideB = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.76, 0.10), vm.sideMat);
+        sideB.position.set(sxB, 0.94, 0.33);
         vmGrp.add(sideB);
       }
 
-      // Outer semi-transparent protective showcase glass pane over upper drink bay
+      // Outer protective showcase glass pane over upper drink bay
       const vmGlass = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 1.04), clearGlassMat);
       vmGlass.position.set(0, 1.24, 0.365);
       markTiny(vmGlass);
@@ -3018,7 +3477,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       markTiny(octPad);
       vmGrp.add(octPad);
 
-      // 4 tiny dark leveling feet
+      // 4 dark leveling feet
       for (const [fx, fz] of [
         [-0.36, -0.24],
         [0.36, -0.24],
@@ -3031,11 +3490,11 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
         vmGrp.add(foot);
       }
 
-      vendingGroup.add(vmGrp);
-      addContactShadow(vm.x, vm.z, 0.88, 0.72, 0.48);
+      mtrGroup.add(vmGrp);
+      addContactShadow(vm.x, vm.z, 0.88, 0.72, 0.44);
     }
 
-    group.add(vendingGroup);
+    group.add(mtrGroup);
   }
 
   // =========================================================================

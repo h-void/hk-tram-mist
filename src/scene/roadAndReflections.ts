@@ -2,7 +2,11 @@ import * as THREE from 'three';
 import { applyRadialMistFade, type RadialMistUniforms } from './atmosphere';
 import {
   createGlowSpriteTexture,
+  createManholeTexture,
+  createPlazaPaverTexture,
+  createRoadStencilTexture,
   createSidewalkTexture,
+  createTactilePavingTexture,
   createWetRoadTextures,
   createYellowBoxTexture,
   createZebraTexture
@@ -191,23 +195,33 @@ class PlanarWetReflector extends THREE.Mesh {
         void main() {
           vec2 uv = vReflectUv.xy / max(vReflectUv.w, 0.0001);
 
-          // Delicate rain-ripple surface shimmer on wet puddles
+          // Organic wet-tarmac micro-grain + delicate animated rain-ripple surface shimmer
+          float g1 = sin(vWorldPos.x * 13.7 + vWorldPos.z * 9.3) * cos(vWorldPos.x * 8.1 - vWorldPos.z * 11.4);
           float w1 = sin(vWorldPos.x * 5.2 + vWorldPos.z * 3.8 + uTime * 2.4);
           float w2 = cos(vWorldPos.x * 7.6 - vWorldPos.z * 6.1 - uTime * 1.9);
-          vec2 jitter = vec2(w1 + w2 * 0.6, w2 - w1 * 0.5) * 0.0014;
+          vec2 jitter = vec2((w1 + w2 * 0.6) * 0.0011 + g1 * 0.0009, (w2 - w1 * 0.5) * 0.0014);
 
-          // 5-tap wet asphalt anisotropic sheen blur
-          vec2 blurY = vec2(0.0, 0.0044);
-          vec2 blurX = vec2(0.0018, 0.0);
-          vec3 col = texture2D(tDiffuse, clamp(uv + jitter, 0.002, 0.998)).rgb * 0.36;
-          col += texture2D(tDiffuse, clamp(uv + jitter + blurY, 0.002, 0.998)).rgb * 0.19;
-          col += texture2D(tDiffuse, clamp(uv + jitter - blurY, 0.002, 0.998)).rgb * 0.19;
-          col += texture2D(tDiffuse, clamp(uv + jitter + blurX, 0.002, 0.998)).rgb * 0.13;
-          col += texture2D(tDiffuse, clamp(uv + jitter - blurX, 0.002, 0.998)).rgb * 0.13;
+          // 9-tap anisotropic wet-asphalt vertical streak filter (silky rain-slicked neon ribbons!)
+          vec2 stepY = vec2(0.0, 0.0046);
+          vec2 stepX = vec2(0.0020, 0.0);
+          vec3 col = texture2D(tDiffuse, clamp(uv + jitter, 0.002, 0.998)).rgb * 0.24;
+          col += texture2D(tDiffuse, clamp(uv + jitter + stepY, 0.002, 0.998)).rgb * 0.14;
+          col += texture2D(tDiffuse, clamp(uv + jitter - stepY, 0.002, 0.998)).rgb * 0.14;
+          col += texture2D(tDiffuse, clamp(uv + jitter + stepY * 2.1, 0.002, 0.998)).rgb * 0.09;
+          col += texture2D(tDiffuse, clamp(uv + jitter - stepY * 2.1, 0.002, 0.998)).rgb * 0.09;
+          col += texture2D(tDiffuse, clamp(uv + jitter + stepY * 3.4, 0.002, 0.998)).rgb * 0.05;
+          col += texture2D(tDiffuse, clamp(uv + jitter - stepY * 3.4, 0.002, 0.998)).rgb * 0.05;
+          col += texture2D(tDiffuse, clamp(uv + jitter + stepX, 0.002, 0.998)).rgb * 0.10;
+          col += texture2D(tDiffuse, clamp(uv + jitter - stepX, 0.002, 0.998)).rgb * 0.10;
 
-          // Wet dark-tar Fresnel contrast: keeps shadows rich dark slate while bright neon/shops gleam
-          vec3 graded = pow(max(col, vec3(0.0)), vec3(1.12));
-          vec3 reflected = graded * uTint * uBoost * 0.78;
+          // Soft-knee HDR shoulder compression prevents boxy bright bulb firefly squares
+          col = max(col, vec3(0.0));
+          col = col / (vec3(1.0) + col * 0.42);
+
+          // Wet dark-tar Fresnel grading: keeps dark asphalt moody while warm shops & neon gleam richly
+          vec3 graded = pow(col, vec3(1.16));
+          float grainMod = 0.94 + 0.06 * g1;
+          vec3 reflected = graded * uTint * uBoost * 0.78 * grainMod;
 
           // Smooth radial mist dissolve matched cleanly with road/sidewalk fade
           float dist = length(vWorldPos.xz - uMistCenter);
@@ -368,8 +382,8 @@ export function createRoadAndReflections(
     roughnessMap: roadTex.roughness,
     alphaMap: roadTex.puddleAlpha,
     transparent: true,
-    roughness: 0.44,
-    metalness: 0.14
+    roughness: 0.62,
+    metalness: 0.08
   });
   applyRadialMistFade(roadMat, mistUniforms, roadMistFade);
   const roadMesh = new THREE.Mesh(new THREE.PlaneGeometry(10.8, ROAD_LEN), roadMat);
@@ -381,7 +395,8 @@ export function createRoadAndReflections(
   group.add(roadMesh);
   hiddenDuringReflection.push(roadMesh);
 
-  // 3. Road markings layer (y = 0.032): Zebra Crossing (斑馬線 z=+3.4), Yellow Box (黃格 z=+0.2), Drainage Grates
+  // 3. Road markings layer (y = 0.032): Zebra Crossing (斑馬線 z=+3.4), Yellow Box (黃格 z=+0.2),
+  // Iconic HK LOOK LEFT / LOOK RIGHT stencils, Double-Yellow Curb Lines, Drainage Grates & Manholes
   const markingsGroup = new THREE.Group();
   markingsGroup.name = 'RoadMarkingsGroup';
 
@@ -417,11 +432,75 @@ export function createRoadAndReflections(
   yellowBoxMesh.renderOrder = 3;
   markingsGroup.add(yellowBoxMesh);
 
+  // Iconic Hong Kong tarmac pedestrian safety stencils (望左 LOOK LEFT / 望右 LOOK RIGHT)
+  const stencilLeftMat = new THREE.MeshStandardMaterial({
+    map: createRoadStencilTexture('left'),
+    transparent: true,
+    opacity: 0.82,
+    roughness: 0.70,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -1
+  });
+  const stencilRightMat = new THREE.MeshStandardMaterial({
+    map: createRoadStencilTexture('right'),
+    transparent: true,
+    opacity: 0.82,
+    roughness: 0.70,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -1
+  });
+
+  // East-side curb edge (pedestrians stepping off east sidewalk toward zebra): LOOK RIGHT / 望右
+  const eastStencil = new THREE.Mesh(new THREE.PlaneGeometry(1.42, 0.72), stencilRightMat);
+  eastStencil.rotation.x = -Math.PI / 2;
+  eastStencil.rotation.z = Math.PI / 2;
+  eastStencil.position.set(3.55, 0.033, 5.12);
+  eastStencil.receiveShadow = true;
+  eastStencil.renderOrder = 3;
+  eastStencil.userData.skipPrintEdges = true;
+  markingsGroup.add(eastStencil);
+
+  // West-side curb edge (pedestrians stepping off west sidewalk watching southbound tram): LOOK LEFT / 望左
+  const westStencil = new THREE.Mesh(new THREE.PlaneGeometry(1.42, 0.72), stencilLeftMat);
+  westStencil.rotation.x = -Math.PI / 2;
+  westStencil.rotation.z = -Math.PI / 2;
+  westStencil.position.set(-3.55, 0.033, 5.12);
+  westStencil.receiveShadow = true;
+  westStencil.renderOrder = 3;
+  westStencil.userData.skipPrintEdges = true;
+  markingsGroup.add(westStencil);
+
+  // Circular cast-iron Hong Kong Waterworks / Drainage manhole covers (HK DC)
+  const manholeMat = new THREE.MeshStandardMaterial({
+    map: createManholeTexture(),
+    transparent: true,
+    roughness: 0.48,
+    metalness: 0.56,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -1
+  });
+  applyRadialMistFade(manholeMat, mistUniforms, roadMistFade);
+  for (const [mx, mz] of [
+    [0.18, 7.8],
+    [-0.28, -5.8]
+  ]) {
+    const mh = new THREE.Mesh(new THREE.PlaneGeometry(0.76, 0.76), manholeMat);
+    mh.rotation.x = -Math.PI / 2;
+    mh.position.set(mx, 0.033, mz);
+    mh.receiveShadow = true;
+    mh.renderOrder = 3;
+    mh.userData.skipPrintEdges = true;
+    markingsGroup.add(mh);
+  }
+
   // Signature Hong Kong painted Double Yellow No-Parking Lines (雙黃線) along BOTH curbs (x = ±4.80 & ±4.93)
   const doubleYellowTex = createDoubleYellowPaintTexture();
   const doubleYellowMat = new THREE.MeshStandardMaterial({
     map: doubleYellowTex,
-    roughness: 0.40,
+    roughness: 0.42,
     metalness: 0.10,
     transparent: true,
     opacity: 0.90,
@@ -462,7 +541,7 @@ export function createRoadAndReflections(
   group.add(markingsGroup);
   hiddenDuringReflection.push(markingsGroup);
 
-  // 4. Soft wet-surface localized warm/cyan specular spill pools (re-aligned to decompressed shops/vending/kiosk!)
+  // 4. Soft wet-surface localized warm/cyan specular spill pools synced with refined shops/MTR/kiosk
   const glowGroup = new THREE.Group();
   glowGroup.name = 'WetPuddleGlowPools';
   const glowTex = createGlowSpriteTexture();
@@ -494,16 +573,17 @@ export function createRoadAndReflections(
   };
 
   // Warm tungsten spills on wet asphalt road outside 金鳳冰室 (B1) & 明記雲吞麵 (B2)
-  addPuddleGlow(-3.3, 6.8, 6.4, 5.8, 0xff9b38, 0.26);
-  addPuddleGlow(-3.2, 0.5, 6.8, 4.8, 0xff9634, 0.34);
-  addPuddleGlow(-3.6, 5.4, 3.8, 3.6, 0xff5448, 0.14);
-  // Crisp icy-cyan reflection spill on east wet road & east sidewalk plaza outside vending machines (7.0..8.15, 2.5)
-  addPuddleGlow(3.3, 3.6, 5.8, 5.2, 0x62e2ff, 0.24);
-  addPuddleGlow(7.55, 3.85, 4.6, 3.6, 0x76ebff, 0.24, 0.175);
-  // Warm amber damp-granite spill outside east plaza newspaper kiosk (9.4, 7.4)
-  addPuddleGlow(8.7, 8.2, 4.4, 3.8, 0xffb250, 0.20, 0.175);
-  // Subtle cyan wet sheen outside far-right B4 24H convenience store (15.4, -9.6)
-  addPuddleGlow(14.5, -5.8, 5.0, 3.4, 0x72e6ff, 0.18, 0.175);
+  addPuddleGlow(-3.3, 6.8, 6.4, 5.8, 0xff9b38, 0.24);
+  addPuddleGlow(-3.2, 0.5, 6.8, 4.8, 0xff9634, 0.30);
+  addPuddleGlow(-3.6, 5.4, 3.8, 3.6, 0xff5448, 0.13);
+  // Subtle icy-cyan & warm-white reflection spill outside East Plaza vending machines & MTR Exit A3
+  addPuddleGlow(3.3, 3.5, 5.2, 4.6, 0x5cd8f6, 0.18);
+  addPuddleGlow(7.65, 3.65, 4.0, 3.2, 0x6ce2fa, 0.16, 0.175);
+  addPuddleGlow(11.1, 3.15, 4.4, 3.0, 0xffe0a8, 0.16, 0.175);
+  // Warm amber damp-granite spill outside east plaza newspaper kiosk (9.4, 7.4) & phone booth
+  addPuddleGlow(8.7, 8.2, 4.4, 3.8, 0xffb250, 0.19, 0.175);
+  // Crisp cyan wet sheen outside far-right B4 24H convenience store (15.4, -9.6)
+  addPuddleGlow(14.6, -5.6, 5.6, 3.8, 0x72e6ff, 0.20, 0.175);
 
   group.add(glowGroup);
   hiddenDuringReflection.push(glowGroup);
@@ -599,6 +679,122 @@ export function createRoadAndReflections(
 
   group.add(buildOpenSidewalk(-1));
   group.add(buildOpenSidewalk(1));
+
+  // 7B. Hong Kong Sidewalk Urban Zoning: Interlocking Plaza Paver Inlays & Yellow Tactile Guide Paths (觸覺引路帶)
+  {
+    const zoningGroup = new THREE.Group();
+    zoningGroup.name = 'SidewalkUrbanZoning';
+
+    const plazaTex = createPlazaPaverTexture();
+
+    const addPlazaInlay = (cx: number, cz: number, w: number, d: number, rx: number, ry: number) => {
+      const mTex = plazaTex.clone();
+      mTex.needsUpdate = true;
+      mTex.repeat.set(rx, ry);
+      const mMat = new THREE.MeshStandardMaterial({
+        map: mTex,
+        roughness: 0.72,
+        metalness: 0.06
+      });
+      applyRadialMistFade(mMat, mistUniforms, roadMistFade);
+      const inlay = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mMat);
+      inlay.rotation.x = -Math.PI / 2;
+      inlay.position.set(cx, sidewalkY + 0.005, cz);
+      inlay.receiveShadow = true;
+      inlay.userData.skipPrintEdges = true;
+      zoningGroup.add(inlay);
+
+      // Subtle granite perimeter curb border strip framing the paver pocket
+      const borderMat = curbMat;
+      const bw = 0.14;
+      for (const [bx, bz, sw, sd] of [
+        [cx, cz - d * 0.5, w + bw, bw],
+        [cx, cz + d * 0.5, w + bw, bw],
+        [cx - w * 0.5, cz, bw, d],
+        [cx + w * 0.5, cz, bw, d]
+      ]) {
+        const b = new THREE.Mesh(new THREE.BoxGeometry(sw, 0.016, sd), borderMat);
+        b.position.set(bx, sidewalkY + 0.008, bz);
+        b.receiveShadow = true;
+        b.userData.skipPrintEdges = true;
+        zoningGroup.add(b);
+      }
+    };
+
+    // Front-Left Bauhinia Rest Corner paver terrace (x in [-13.8, -6.4], z in [10.0, 14.2])
+    addPlazaInlay(-10.1, 12.1, 7.4, 4.2, 5, 3);
+
+    // Front-Right East Pocket Park & Kiosk Plaza paver terrace (x in [10.4, 16.4], z in [4.2, 10.8])
+    addPlazaInlay(13.4, 7.5, 6.0, 6.6, 4, 5);
+
+    // Classic Hong Kong Safety-Yellow Tactile Guide Strips (觸覺引路帶) & Blister Warning Pads
+    const tactileStripTex = createTactilePavingTexture('strip');
+    const tactileBlisterTex = createTactilePavingTexture('blister');
+
+    const makeStripMesh = (cx: number, cz: number, w: number, d: number, alongX = false) => {
+      const tex = tactileStripTex.clone();
+      tex.needsUpdate = true;
+      const len = alongX ? w : d;
+      tex.repeat.set(1, Math.max(1, Math.round(len / 0.34)));
+      const mat = new THREE.MeshStandardMaterial({
+        map: tex,
+        roughness: 0.56,
+        metalness: 0.06
+      });
+      applyRadialMistFade(mat, mistUniforms, roadMistFade);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(alongX ? d : w, alongX ? w : d), mat);
+      m.rotation.x = -Math.PI / 2;
+      if (alongX) m.rotation.z = Math.PI / 2;
+      m.position.set(cx, sidewalkY + 0.009, cz);
+      m.receiveShadow = true;
+      m.userData.skipPrintEdges = true;
+      zoningGroup.add(m);
+    };
+
+    const makeBlisterPad = (cx: number, cz: number, w: number, d: number) => {
+      const tex = tactileBlisterTex.clone();
+      tex.needsUpdate = true;
+      tex.repeat.set(Math.max(1, Math.round(w / 0.34)), Math.max(1, Math.round(d / 0.34)));
+      const mat = new THREE.MeshStandardMaterial({
+        map: tex,
+        roughness: 0.56,
+        metalness: 0.06
+      });
+      applyRadialMistFade(mat, mistUniforms, roadMistFade);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(cx, sidewalkY + 0.010, cz);
+      m.receiveShadow = true;
+      m.userData.skipPrintEdges = true;
+      zoningGroup.add(m);
+    };
+
+    // West sidewalk guide path running along x = -6.12 -> branches to Zebra (z=3.4) & Tram Stop (z=7.0)
+    makeStripMesh(-6.12, 5.2, 0.32, 16.5, false);
+    makeBlisterPad(-5.60, 3.4, 0.68, 1.48); // Zebra crossing tactile warning pad
+    makeBlisterPad(-5.68, 7.0, 0.56, 1.32); // Tram stop boarding warning pad
+
+    // East sidewalk guide path running along x = +6.15 -> connects Zebra (z=3.4) to MTR Exit A3 (z=2.5..3.4, x=6.15..11.0)!
+    makeStripMesh(6.15, 3.4, 0.32, 12.2, false);
+    makeBlisterPad(5.60, 3.4, 0.68, 1.48); // East zebra crossing tactile warning pad
+    makeStripMesh(8.65, 3.4, 4.7, 0.32, true); // East branch leading straight to MTR Exit A3 stairwell!
+    makeBlisterPad(11.15, 2.85, 1.28, 0.56); // MTR Exit A3 stairwell top warning pad
+
+    // Sidewalk cast-iron inspection covers
+    for (const [mx, mz] of [
+      [6.8, 6.2],
+      [-6.8, 10.6]
+    ]) {
+      const mh = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.62), manholeMat);
+      mh.rotation.x = -Math.PI / 2;
+      mh.position.set(mx, sidewalkY + 0.008, mz);
+      mh.receiveShadow = true;
+      mh.userData.skipPrintEdges = true;
+      zoningGroup.add(mh);
+    }
+
+    group.add(zoningGroup);
+  }
 
   // 8. Classic Hong Kong Green Tubular Steel Pedestrian Railings at x = ±5.28 (mist-faded 16.0..24.5)
   const railingMat = new THREE.MeshStandardMaterial({

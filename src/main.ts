@@ -106,22 +106,26 @@ function boot(): void {
   const scene = new THREE.Scene();
 
   const FRUSTUM_SIZE = 32.8;
+  const computeFrustumSize = (asp: number): number =>
+    asp < 1.08 ? FRUSTUM_SIZE * Math.min(2.28, 1.12 / Math.max(0.42, asp)) : FRUSTUM_SIZE;
+
   const aspect = window.innerWidth / Math.max(1, window.innerHeight);
+  const initialFrustum = computeFrustumSize(aspect);
   const camera = new THREE.OrthographicCamera(
-    (-FRUSTUM_SIZE * aspect) / 2,
-    (FRUSTUM_SIZE * aspect) / 2,
-    FRUSTUM_SIZE / 2,
-    -FRUSTUM_SIZE / 2,
+    (-initialFrustum * aspect) / 2,
+    (initialFrustum * aspect) / 2,
+    initialFrustum / 2,
+    -initialFrustum / 2,
     -50,
     240
   );
   camera.position.set(42, 35, 42);
-  camera.zoom = 0.91;
+  camera.zoom = 0.885;
   camera.updateProjectionMatrix();
 
   // 3. Smooth Damped OrbitControls with Tasteful Bounds
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0.8, 4.35, -1.45);
+  controls.target.set(0.45, 4.5, -1.15);
   controls.enableDamping = true;
   controls.dampingFactor = 0.065;
   controls.rotateSpeed = 0.65;
@@ -156,6 +160,7 @@ function boot(): void {
   const viaductAndVehicles = createViaductAndVehicles(scene, atmosphere.mistUniforms);
   const propsAndLife = createPropsAndLife(scene);
   const weatherAndEffects = createWeatherAndEffects(scene, {
+    mistUniforms: atmosphere.mistUniforms,
     neonPositions: buildings.neonPositions,
     bauhiniaCenters: propsAndLife.bauhiniaCenters,
     printTargetGroups: {
@@ -190,22 +195,22 @@ function boot(): void {
     if (view === 'tram') {
       const tp = viaductAndVehicles.getTramPosition();
       return {
-        pos: new THREE.Vector3(tp.x + 24, 17.5, tp.z + 24),
-        target: new THREE.Vector3(tp.x + 0.15, 2.35, tp.z + 0.3),
-        zoom: 2.05
+        pos: new THREE.Vector3(tp.x + 24, 17.2, tp.z + 24),
+        target: new THREE.Vector3(tp.x + 0.15, 2.25, tp.z + 0.3),
+        zoom: 1.92
       };
     }
     if (view === 'street') {
       return {
-        pos: new THREE.Vector3(20.0, 13.5, 38.0),
-        target: new THREE.Vector3(-0.5, 3.2, -1.0),
-        zoom: 1.48
+        pos: new THREE.Vector3(22.0, 14.0, 39.5),
+        target: new THREE.Vector3(0.15, 4.35, -1.6),
+        zoom: 1.24
       };
     }
     return {
       pos: new THREE.Vector3(42, 35, 42),
-      target: new THREE.Vector3(0.8, 4.35, -1.45),
-      zoom: 0.91
+      target: new THREE.Vector3(0.45, 4.5, -1.15),
+      zoom: 0.885
     };
   };
 
@@ -392,10 +397,11 @@ function boot(): void {
     const w = window.innerWidth;
     const h = Math.max(1, window.innerHeight);
     const asp = w / h;
-    camera.left = (-FRUSTUM_SIZE * asp) / 2;
-    camera.right = (FRUSTUM_SIZE * asp) / 2;
-    camera.top = FRUSTUM_SIZE / 2;
-    camera.bottom = -FRUSTUM_SIZE / 2;
+    const fSize = computeFrustumSize(asp);
+    camera.left = (-fSize * asp) / 2;
+    camera.right = (fSize * asp) / 2;
+    camera.top = fSize / 2;
+    camera.bottom = -fSize / 2;
     camera.updateProjectionMatrix();
 
     renderer.setSize(w, h);

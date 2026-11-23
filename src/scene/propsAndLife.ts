@@ -4,7 +4,9 @@ import {
   createBauhiniaCanopyTexture,
   createContactShadowTexture,
   createCorrugatedTinTexture,
+  createFoliageCanopyTexture,
   createNewsRackTexture,
+  createPhoneBoothSignTexture,
   createStreetPlaqueTexture,
   createTramStopSignTexture
 } from './textures';
@@ -1021,10 +1023,10 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     addHKBollard(5.38, 9.26);
     addHKBollard(-5.38, 5.72);
 
-    // C. Weathered Roadside Electrical Feeder Box (電箱 HKE-042) tucked cleanly beside kiosk back-right corner
+    // C. Weathered Roadside Electrical Feeder Box (電箱 HKE-042) tucked cleanly beside kiosk east wall
     const eBox = new THREE.Group();
     eBox.name = 'HK_ElectricalFeederBox';
-    eBox.position.set(11.55, Y0, 7.05);
+    eBox.position.set(9.95, Y0, 8.25);
 
     const eSideMat = new THREE.MeshStandardMaterial({
       color: 0x576661,
@@ -1064,7 +1066,7 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     eBox.add(hasp);
 
     group.add(eBox);
-    addRoundAO(11.55, 7.05, 0.66, 0.52);
+    addRoundAO(9.95, 8.25, 0.66, 0.52);
   }
 
   // =========================================================================
@@ -1221,7 +1223,7 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
   };
 
   addHKRubbishBin(-6.0, 8.8);
-  addHKRubbishBin(9.1, 2.7);
+  addHKRubbishBin(13.85, 2.65);
 
   // =========================================================================
   // 6. T-SHAPED 灣仔道 WAN CHAI RD PLAQUE, ROUND 電車站 TRAM STOP & CONVEX MIRROR
@@ -1450,90 +1452,138 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
   }
 
   // =========================================================================
-  // 9. PAINTERLY MATTE BAUHINIA (洋紫荊) BLOSSOM TREES & BENCH
+  // 9. PAINTERLY MATTE BAUHINIA (洋紫荊) & WEEPING BANYAN (榕樹) TREES,
+  // GRANITE TREE PITS, HERITAGE HK POSTBOX, VINTAGE TELEPHONE BOOTH & BENCHES
   // =========================================================================
-  const bauhiniaShadowMatA = new THREE.MeshStandardMaterial({
-    map: bauhiniaTex,
-    color: 0x7b5478,
-    roughness: 0.96,
+  const foliageTex = createFoliageCanopyTexture(515);
+  const foliageDarkMat = new THREE.MeshStandardMaterial({
+    map: foliageTex,
+    color: 0x2f6848,
+    roughness: 0.94,
     metalness: 0.0
   });
+  const foliageMidMat = new THREE.MeshStandardMaterial({
+    map: foliageTex,
+    color: 0x468860,
+    roughness: 0.94,
+    metalness: 0.0
+  });
+  const foliageLightMat = new THREE.MeshStandardMaterial({
+    map: foliageTex,
+    color: 0x64a878,
+    roughness: 0.94,
+    metalness: 0.0
+  });
+
   const bauhiniaShadowMatB = new THREE.MeshStandardMaterial({
     map: bauhiniaTex,
-    color: 0x94648c,
+    color: 0x9b5a84,
     roughness: 0.96,
     metalness: 0.0
   });
   const bauhiniaMidMat = new THREE.MeshStandardMaterial({
     map: bauhiniaTex,
-    color: 0xc980a6,
+    color: 0xcc7ca4,
     roughness: 0.96,
     metalness: 0.0
   });
   const bauhiniaLightMatA = new THREE.MeshStandardMaterial({
     map: bauhiniaTex,
-    color: 0xe3a0c0,
+    color: 0xe69ec0,
     roughness: 0.96,
     metalness: 0.0
   });
   const bauhiniaLightMatB = new THREE.MeshStandardMaterial({
     map: bauhiniaTex,
-    color: 0xf0c2d8,
+    color: 0xf4c4da,
     roughness: 0.96,
     metalness: 0.0
   });
+
+  const graniteCurbMat = new THREE.MeshStandardMaterial({ color: 0x768490, roughness: 0.84 });
+  const soilMat = new THREE.MeshStandardMaterial({ color: 0x2c2622, roughness: 0.96 });
+  const trunkMat = new THREE.MeshStandardMaterial({
+    color: 0x3e302c,
+    roughness: 0.94,
+    metalness: 0.0
+  });
+
+  const buildTreePitGrate = (parent: THREE.Group, size: number) => {
+    const pit = new THREE.Group();
+    const curbH = 0.14;
+    const curbT = 0.12;
+    for (const [bx, bz, w, d] of [
+      [0, -size * 0.5, size + curbT, curbT],
+      [0, size * 0.5, size + curbT, curbT],
+      [-size * 0.5, 0, curbT, size],
+      [size * 0.5, 0, curbT, size]
+    ]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(w, curbH, d), graniteCurbMat);
+      rail.position.set(bx, curbH * 0.5, bz);
+      rail.receiveShadow = true;
+      pit.add(rail);
+    }
+    const soil = new THREE.Mesh(new THREE.BoxGeometry(size - 0.08, 0.07, size - 0.08), soilMat);
+    soil.position.y = 0.035;
+    pit.add(soil);
+    // Slotted dark cast-iron HK tree grate bars
+    for (let i = -2; i <= 2; i++) {
+      if (i === 0) continue;
+      const bar = markSkipPrintEdges(
+        new THREE.Mesh(new THREE.BoxGeometry(size - 0.14, 0.02, 0.045), darkMetalMat)
+      );
+      bar.position.set(0, 0.085, i * (size * 0.18));
+      pit.add(bar);
+    }
+    parent.add(pit);
+  };
 
   const addBauhiniaTree = (x: number, z: number, scale = 1.0, seedBase = 11) => {
     const tree = new THREE.Group();
     tree.position.set(x, Y0, z);
 
-    const trunkMat = new THREE.MeshStandardMaterial({
-      color: 0x3e2f2e,
-      roughness: 0.94,
-      metalness: 0.0
-    });
-
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.11 * scale, 0.19 * scale, 1.85 * scale, 8), trunkMat);
-    trunk.position.y = 0.92 * scale;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.10 * scale, 0.18 * scale, 1.92 * scale, 8), trunkMat);
+    trunk.position.y = 0.96 * scale;
     trunk.rotation.z = 0.06;
     trunk.castShadow = true;
     tree.add(trunk);
 
     const branchSpecs: Array<[number, number, number, number, number]> = [
-      [-0.36, 1.85, 0.22, 0.55, -0.45],
-      [0.42, 1.92, -0.18, -0.52, 0.35],
-      [0.08, 2.02, 0.36, -0.25, 0.52],
-      [-0.22, 1.95, -0.32, 0.35, -0.42]
+      [-0.36, 1.88, 0.22, 0.55, -0.45],
+      [0.42, 1.94, -0.18, -0.52, 0.35],
+      [0.08, 2.04, 0.36, -0.25, 0.52],
+      [-0.22, 1.98, -0.32, 0.35, -0.42]
     ];
     for (const [bx, by, bz, rz, rx] of branchSpecs) {
-      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.048 * scale, 0.088 * scale, 1.12 * scale, 7), trunkMat);
+      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.044 * scale, 0.082 * scale, 1.16 * scale, 7), trunkMat);
       br.position.set(bx * scale, by * scale, bz * scale);
       br.rotation.set(rx, 0, rz);
       br.castShadow = true;
       tree.add(br);
     }
 
+    // Authentic Hong Kong Bauhinia: lush deep emerald foliage mixed with layered magenta/blush blossom puffs!
     const clusterSpecs: Array<[number, number, number, number, THREE.MeshStandardMaterial]> = [
-      [-0.68, 2.15, 0.28, 0.54, bauhiniaShadowMatA],
-      [0.64, 2.18, -0.24, 0.56, bauhiniaShadowMatA],
-      [0.14, 2.14, 0.58, 0.52, bauhiniaShadowMatB],
-      [-0.34, 2.20, -0.54, 0.54, bauhiniaShadowMatB],
-      [0.0, 2.30, 0.0, 0.62, bauhiniaShadowMatB],
-      [-0.92, 2.52, -0.06, 0.52, bauhiniaMidMat],
-      [0.88, 2.54, 0.16, 0.54, bauhiniaMidMat],
-      [-0.18, 2.56, 0.82, 0.48, bauhiniaMidMat],
-      [0.36, 2.58, -0.74, 0.50, bauhiniaMidMat],
-      [-0.48, 2.66, 0.44, 0.56, bauhiniaLightMatA],
-      [0.44, 2.86, 0.38, 0.52, bauhiniaLightMatA],
-      [-0.46, 2.90, -0.24, 0.54, bauhiniaLightMatA],
-      [0.12, 3.06, -0.32, 0.48, bauhiniaLightMatB],
-      [-0.12, 3.16, 0.18, 0.50, bauhiniaLightMatB],
-      [0.62, 2.82, -0.22, 0.44, bauhiniaLightMatB]
+      [-0.70, 2.12, 0.26, 0.52, foliageDarkMat],
+      [0.64, 2.16, -0.24, 0.54, foliageDarkMat],
+      [0.14, 2.14, 0.58, 0.50, foliageMidMat],
+      [-0.34, 2.20, -0.54, 0.52, foliageDarkMat],
+      [0.0, 2.30, 0.0, 0.60, foliageMidMat],
+      [-0.90, 2.52, -0.06, 0.50, bauhiniaMidMat],
+      [0.86, 2.54, 0.16, 0.52, bauhiniaShadowMatB],
+      [-0.18, 2.58, 0.80, 0.46, bauhiniaLightMatA],
+      [0.36, 2.58, -0.72, 0.48, foliageMidMat],
+      [-0.48, 2.68, 0.44, 0.54, bauhiniaLightMatA],
+      [0.44, 2.86, 0.38, 0.50, bauhiniaMidMat],
+      [-0.46, 2.92, -0.24, 0.52, foliageLightMat],
+      [0.12, 3.08, -0.32, 0.46, bauhiniaLightMatB],
+      [-0.12, 3.16, 0.18, 0.48, bauhiniaLightMatB],
+      [0.62, 2.84, -0.22, 0.42, bauhiniaLightMatA]
     ];
 
     clusterSpecs.forEach(([px, py, pz, r, mat], idx) => {
       const geom = createOrganicFoliageGeometry(r * scale, seedBase + idx * 1.9);
-      const puff = new THREE.Mesh(geom, mat);
+      const puff = markSkipPrintEdges(new THREE.Mesh(geom, mat));
       puff.position.set(px * scale, py * scale, pz * scale);
       puff.rotation.set(idx * 0.4, idx * 0.9, idx * 0.3);
       puff.castShadow = true;
@@ -1549,35 +1599,135 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     });
     for (let i = 0; i < 14; i++) {
       const ang = (i / 14) * Math.PI * 2 + scale;
-      const dist = (0.55 + (i % 4) * 0.38) * scale;
-      const p = new THREE.Mesh(new THREE.CircleGeometry(0.06, 6), petalMat);
+      const dist = (0.58 + (i % 4) * 0.36) * scale;
+      const p = new THREE.Mesh(new THREE.CircleGeometry(0.058, 6), petalMat);
       p.rotation.x = -Math.PI / 2;
       p.position.set(Math.cos(ang) * dist, 0.018, Math.sin(ang) * dist);
       tree.add(p);
     }
 
-    const planter = new THREE.Mesh(
-      new THREE.BoxGeometry(1.15 * scale, 0.22, 1.15 * scale),
-      new THREE.MeshStandardMaterial({ color: 0x6f7d8a, roughness: 0.85 })
-    );
-    planter.position.y = 0.11;
-    tree.add(planter);
+    buildTreePitGrate(tree, 1.18 * scale);
 
     group.add(tree);
-    addRoundAO(x, z, 1.45 * scale, 0.46);
+    addRoundAO(x, z, 1.48 * scale, 0.46);
     bauhiniaCenters.push(new THREE.Vector3(x, Y0 + 2.6 * scale, z));
   };
 
-  // Wide Open Front-Left Bauhinia Plaza + Far-Right Blossom Accent peeking beside B4 behind viaduct!
+  // Lush Deep-Green Hong Kong Weeping Banyan / Ficus Street Tree (榕樹) with hanging aerial roots & raised granite planter
+  const addBanyanPocketTree = (x: number, z: number, scale = 1.05) => {
+    const tree = new THREE.Group();
+    tree.name = 'HK_EastPocketBanyanTree';
+    tree.position.set(x, Y0, z);
+
+    // Raised granite pocket-park planter box with stepped seating ledge & ornamental fern shrubs
+    const pSize = 1.85;
+    const planterBase = new THREE.Mesh(new THREE.BoxGeometry(pSize, 0.36, pSize), graniteCurbMat);
+    planterBase.position.y = 0.18;
+    planterBase.castShadow = true;
+    planterBase.receiveShadow = true;
+    tree.add(planterBase);
+    const planterLedge = new THREE.Mesh(
+      new THREE.BoxGeometry(pSize + 0.14, 0.08, pSize + 0.14),
+      new THREE.MeshStandardMaterial({ color: 0x8a97a2, roughness: 0.76 })
+    );
+    planterLedge.position.y = 0.38;
+    tree.add(planterLedge);
+    const soilTop = new THREE.Mesh(new THREE.BoxGeometry(pSize - 0.24, 0.06, pSize - 0.24), soilMat);
+    soilTop.position.y = 0.38;
+    tree.add(soilTop);
+
+    // Gnarled multi-stem Hong Kong Banyan trunk & wide spreading boughs
+    const mainTrunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14 * scale, 0.24 * scale, 1.85 * scale, 9),
+      trunkMat
+    );
+    mainTrunk.position.y = 0.38 + 0.92 * scale;
+    mainTrunk.rotation.z = -0.05;
+    mainTrunk.castShadow = true;
+    tree.add(mainTrunk);
+
+    const boughs: Array<[number, number, number, number, number]> = [
+      [-0.44, 2.22, 0.24, 0.62, -0.35],
+      [0.48, 2.26, -0.22, -0.58, 0.40],
+      [0.14, 2.34, 0.44, -0.20, 0.58],
+      [-0.24, 2.28, -0.40, 0.38, -0.50]
+    ];
+    for (const [bx, by, bz, rz, rx] of boughs) {
+      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.052 * scale, 0.095 * scale, 1.24 * scale, 7), trunkMat);
+      br.position.set(bx * scale, by * scale, bz * scale);
+      br.rotation.set(rx, 0, rz);
+      br.castShadow = true;
+      tree.add(br);
+    }
+
+    // Iconic slender hanging Banyan aerial root curtains (氣根)
+    for (const [ax, az, len] of [
+      [-0.58, 0.32, 1.35],
+      [0.52, -0.28, 1.22],
+      [0.22, 0.56, 1.15],
+      [-0.32, -0.48, 1.28],
+      [0.64, 0.22, 1.05]
+    ]) {
+      const root = markSkipPrintEdges(
+        new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.008, len * scale, 5), trunkMat)
+      );
+      root.position.set(ax * scale, (2.35 - len * 0.5) * scale, az * scale);
+      tree.add(root);
+    }
+
+    // Rich layered rainforest-green Banyan dome crown
+    const banyanClusters: Array<[number, number, number, number, THREE.MeshStandardMaterial]> = [
+      [-0.82, 2.52, 0.28, 0.62, foliageDarkMat],
+      [0.78, 2.55, -0.26, 0.64, foliageDarkMat],
+      [0.18, 2.52, 0.72, 0.58, foliageDarkMat],
+      [-0.36, 2.58, -0.68, 0.60, foliageDarkMat],
+      [0.0, 2.74, 0.0, 0.72, foliageMidMat],
+      [-0.98, 2.88, -0.14, 0.56, foliageMidMat],
+      [0.94, 2.90, 0.22, 0.58, foliageMidMat],
+      [-0.22, 2.96, 0.86, 0.52, foliageMidMat],
+      [0.44, 2.96, -0.76, 0.54, foliageMidMat],
+      [-0.46, 3.16, 0.42, 0.58, foliageLightMat],
+      [0.48, 3.22, 0.30, 0.56, foliageLightMat],
+      [-0.38, 3.28, -0.32, 0.54, foliageLightMat],
+      [0.06, 3.46, 0.04, 0.56, foliageLightMat]
+    ];
+    banyanClusters.forEach(([px, py, pz, r, mat], idx) => {
+      const geom = createOrganicFoliageGeometry(r * scale, 211 + idx * 2.3);
+      const puff = markSkipPrintEdges(new THREE.Mesh(geom, mat));
+      puff.position.set(px * scale, py * scale, pz * scale);
+      puff.rotation.set(idx * 0.5, idx * 0.8, idx * 0.2);
+      puff.castShadow = true;
+      puff.receiveShadow = true;
+      tree.add(puff);
+    });
+
+    // Low tropical fern shrubs tucked around base of the granite planter
+    for (const [fx, fz] of [
+      [-0.58, 0.56],
+      [0.56, 0.58],
+      [-0.54, -0.54],
+      [0.58, -0.52]
+    ]) {
+      const fern = markSkipPrintEdges(new THREE.Mesh(new THREE.DodecahedronGeometry(0.24, 0), foliageMidMat));
+      fern.scale.set(1.15, 0.75, 1.15);
+      fern.position.set(fx, 0.52, fz);
+      tree.add(fern);
+    }
+
+    group.add(tree);
+    addRoundAO(x, z, 1.72 * scale, 0.50);
+  };
+
+  // Wide Open Front-Left Bauhinia Plaza + East Pocket Park Weeping Banyan Tree!
   addBauhiniaTree(-8.6, 12.0, 1.12, 11);
   addBauhiniaTree(-12.2, 11.2, 0.88, 37);
-  addBauhiniaTree(12.1, -6.2, 0.96, 63);
+  addBanyanPocketTree(14.95, 8.25, 0.88);
 
-  // Wooden Hong Kong Park Bench on open Bauhinia plaza
-  {
+  // Helper: Classic Hong Kong Cast-Iron & Slatted Timber Park Bench
+  const addHKParkBench = (bx: number, bz: number, rotY: number) => {
     const bench = new THREE.Group();
-    bench.position.set(-6.9, Y0, 12.5);
-    bench.rotation.y = -0.35;
+    bench.position.set(bx, Y0, bz);
+    bench.rotation.y = rotY;
 
     const seat = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.08, 0.46), woodMat);
     seat.position.y = 0.42;
@@ -1596,7 +1746,143 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
       bench.add(leg);
     }
     group.add(bench);
-    addRoundAO(-6.9, 12.5, 0.88, 0.42);
+    addRoundAO(bx, bz, 0.88, 0.42);
+  };
+
+  // Front-Left Bauhinia Plaza Bench + East Pocket Park Bench (休憩處長椅)
+  addHKParkBench(-6.9, 12.5, -0.35);
+  addHKParkBench(12.65, 9.55, -Math.PI * 0.82);
+
+  // =========================================================================
+  // 9B. VINTAGE HONG KONG ILLUMINATED TELEPHONE BOOTH (懷舊電話亭)
+  // & HERITAGE HONG KONG PILLAR POSTBOX (郵筒) ON EAST PLAZA
+  // =========================================================================
+  {
+    // A. Vintage Illuminated Hong Kong Telephone Booth at (10.55, 5.75) — clear of MTR Exit A3, kiosk & Banyan!
+    const booth = new THREE.Group();
+    booth.name = 'HK_TelephoneBooth';
+    booth.position.set(10.55, Y0, 5.75);
+    booth.rotation.y = -0.18;
+
+    const boothGlassMat = new THREE.MeshStandardMaterial({
+      color: 0xbce6f4,
+      transparent: true,
+      opacity: 0.24,
+      roughness: 0.12,
+      metalness: 0.25,
+      depthWrite: false
+    });
+    const boothSignTex = createPhoneBoothSignTexture();
+    const boothSignMat = new THREE.MeshStandardMaterial({
+      map: boothSignTex,
+      emissive: new THREE.Color(0xff7864),
+      emissiveMap: boothSignTex,
+      emissiveIntensity: 1.05,
+      roughness: 0.30
+    });
+    emissiveTracks.push({ mat: boothSignMat, base: 1.05 });
+
+    const boothLightMat = new THREE.MeshStandardMaterial({
+      color: 0xfff2cf,
+      emissive: new THREE.Color(0xffc068),
+      emissiveIntensity: 1.95,
+      roughness: 0.2
+    });
+    emissiveTracks.push({ mat: boothLightMat, base: 1.95 });
+
+    const bw = 0.88;
+    const bh = 2.18;
+    // Aluminum plinth base & roof cap
+    const bBase = new THREE.Mesh(new THREE.BoxGeometry(bw + 0.06, 0.10, bw + 0.06), darkMetalMat);
+    bBase.position.y = 0.05;
+    booth.add(bBase);
+
+    for (const [cx, cz] of [
+      [-bw * 0.46, -bw * 0.46],
+      [bw * 0.46, -bw * 0.46],
+      [-bw * 0.46, bw * 0.46],
+      [bw * 0.46, bw * 0.46]
+    ]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.055, bh, 0.055), chromeSteelMat);
+      post.position.set(cx, 0.10 + bh * 0.5, cz);
+      post.castShadow = true;
+      booth.add(post);
+    }
+
+    // Back solid brushed metal wall & 3-sided glazing + mid-height crimson waist kick panel
+    const backP = new THREE.Mesh(new THREE.BoxGeometry(bw - 0.04, bh, 0.05), darkMetalMat);
+    backP.position.set(0, 0.10 + bh * 0.5, -bw * 0.46);
+    booth.add(backP);
+
+    for (const sx of [-bw * 0.46, bw * 0.46]) {
+      const pane = markSkipPrintEdges(new THREE.Mesh(new THREE.PlaneGeometry(bw - 0.12, bh - 0.46), boothGlassMat));
+      pane.rotation.y = Math.PI / 2;
+      pane.position.set(sx, 0.10 + bh * 0.54, 0);
+      booth.add(pane);
+    }
+
+    // Illuminated crimson crown lightbox (電 話 · TEL) wrapping all 4 upper faces!
+    const crownBox = new THREE.Mesh(
+      new THREE.BoxGeometry(bw + 0.02, 0.27, bw + 0.02),
+      [boothSignMat, boothSignMat, darkMetalMat, boothLightMat, boothSignMat, boothSignMat]
+    );
+    crownBox.position.y = 0.10 + bh + 0.135;
+    crownBox.castShadow = true;
+    booth.add(crownBox);
+
+    // Interior wall-mounted HK coin payphone unit & warm interior lamp
+    const phoneBox = markSkipPrintEdges(new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.36, 0.14), chromeSteelMat));
+    phoneBox.position.set(0, 1.32, -bw * 0.36);
+    booth.add(phoneBox);
+    const phoneShelf = markSkipPrintEdges(new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.04, 0.24), darkMetalMat));
+    phoneShelf.position.set(0, 1.02, -bw * 0.30);
+    booth.add(phoneShelf);
+
+    group.add(booth);
+    addRoundAO(10.55, 5.75, 0.68, 0.48);
+
+    // B. Heritage Hong Kong Cast-Iron Pillar Postbox (郵筒) at (6.05, 5.85)
+    const postbox = new THREE.Group();
+    postbox.name = 'HK_HeritagePostbox';
+    postbox.position.set(6.05, Y0, 5.85);
+    postbox.rotation.y = -0.35;
+
+    const postGreenMat = new THREE.MeshStandardMaterial({
+      color: 0x1e5c42,
+      roughness: 0.38,
+      metalness: 0.32
+    });
+    const postPlinth = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.25, 0.22, 14), darkMetalMat);
+    postPlinth.position.y = 0.11;
+    postbox.add(postPlinth);
+    const postBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.22, 1.02, 14), postGreenMat);
+    postBarrel.position.y = 0.73;
+    postBarrel.castShadow = true;
+    postbox.add(postBarrel);
+    const postBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.24, 0.06, 14), postGreenMat);
+    postBrim.position.y = 1.24;
+    postbox.add(postBrim);
+    const postCap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.23, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.52),
+      postGreenMat
+    );
+    postCap.position.y = 1.26;
+    postbox.add(postCap);
+    // Mail slot hood & cream collection-times plaque facing south-west
+    const slot = markSkipPrintEdges(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.05, 0.06), darkMetalMat));
+    slot.position.set(0, 1.06, 0.20);
+    postbox.add(slot);
+    const timeCard = markSkipPrintEdges(
+      new THREE.Mesh(
+        new THREE.BoxGeometry(0.14, 0.19, 0.03),
+        new THREE.MeshStandardMaterial({ color: 0xf0e8d6, roughness: 0.52 })
+      )
+    );
+    timeCard.position.set(0, 0.78, 0.21);
+    postbox.add(timeCard);
+
+    group.add(postbox);
+    addRoundAO(6.05, 5.85, 0.36, 0.46);
   }
 
   // =========================================================================
@@ -1921,17 +2207,30 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
   teaCup.position.set(-8.28, Y0 + 0.74, 6.94);
   group.add(teaCup);
 
-  // 8. East plaza stroller enjoying the misty drizzle between the cyan vending machines & kiosk
+  // 8. East pocket-park stroller walking between the newspaper kiosk & Banyan rest plaza
   addPedestrian({
-    x: 11.2,
-    z: 5.2,
-    rotY: -Math.PI * 0.65,
+    x: 11.25,
+    z: 9.35,
+    rotY: -Math.PI * 0.72,
     coatColor: 0x3b4c5e,
     scarfColor: 0xc9a058,
     accessory: 'tote',
     umbrellaColor: 0x7ab496,
     umbrellaOpacity: 0.76,
     phase: 3.4
+  });
+
+  // 9. Office commuter stepping out of Wan Chai MTR Exit A3 into the misty drizzle
+  addPedestrian({
+    x: 10.75,
+    z: 3.18,
+    rotY: -Math.PI * 0.14,
+    coatColor: 0x354454,
+    scarfColor: 0xc8604c,
+    accessory: 'briefcase',
+    umbrellaColor: 0xd8ecf4,
+    umbrellaOpacity: 0.56,
+    phase: 2.1
   });
 
   scene.add(group);

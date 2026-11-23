@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import type { ViewMode } from '../ui/hud';
+import { applyRadialMistFade, type RadialMistUniforms } from './atmosphere';
+import { createRippleTexture } from './textures';
 
 interface RainSeed {
   x: number;
@@ -128,6 +130,7 @@ function createSteamWispTexture(): THREE.CanvasTexture {
 export function createWeatherAndEffects(
   scene: THREE.Scene,
   opts: {
+    mistUniforms: RadialMistUniforms;
     neonPositions: THREE.Vector3[];
     bauhiniaCenters: THREE.Vector3[];
     printTargetGroups: {
@@ -145,29 +148,60 @@ export function createWeatherAndEffects(
   const rand = mulberry32(202608);
 
   // =========================================================================
-  // 1. DELICATE DIAGONAL FALLING RAIN STREAKS (~560 subtle atmospheric streaks across ±24)
+  // 1. DELICATE TAPERED GLSL DIAGONAL RAIN STREAKS (~620 silky streaks fading softly into mist)
   // =========================================================================
-  const RAIN_COUNT = 560;
+  const RAIN_COUNT = 620;
   const rainSeeds: RainSeed[] = [];
   const rainPositions = new Float32Array(RAIN_COUNT * 2 * 3);
+  const rainEnds = new Float32Array(RAIN_COUNT * 2);
 
   for (let i = 0; i < RAIN_COUNT; i++) {
     rainSeeds.push({
-      x: (rand() - 0.5) * 48,
+      x: (rand() - 0.5) * 44,
       y0: rand() * 19,
-      z: (rand() - 0.5) * 48,
-      speed: 12.5 + rand() * 5.0,
-      len: 0.40 + rand() * 0.32
+      z: (rand() - 0.5) * 44,
+      speed: 13.0 + rand() * 5.2,
+      len: 0.46 + rand() * 0.38
     });
+    // Top tail = 0.0 (transparent), falling tip = 1.0 (soft luminous droplet glint)
+    rainEnds[i * 2] = 0.0;
+    rainEnds[i * 2 + 1] = 1.0;
   }
 
   const rainGeom = new THREE.BufferGeometry();
   rainGeom.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
-  const rainMat = new THREE.LineBasicMaterial({
-    color: 0xc2d8ec,
+  rainGeom.setAttribute('aEnd', new THREE.BufferAttribute(rainEnds, 1));
+  const rainMat = new THREE.ShaderMaterial({
     transparent: true,
-    opacity: 0.14,
-    depthWrite: false
+    depthWrite: false,
+    uniforms: {
+      uColor: { value: new THREE.Color(0x9cb8d4) },
+      uOpacity: { value: 0.16 }
+    },
+    vertexShader: /* glsl */ `
+      attribute float aEnd;
+      varying float vEnd;
+      varying float vRadialFade;
+      void main() {
+        vEnd = aEnd;
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        float dist = length(wp.xz);
+        vRadialFade = 1.0 - smoothstep(14.5, 25.0, dist);
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      varying float vEnd;
+      varying float vRadialFade;
+      void main() {
+        float taper = pow(clamp(vEnd, 0.0, 1.0), 1.65);
+        float alpha = uOpacity * taper * vRadialFade;
+        if (alpha < 0.004) discard;
+        gl_FragColor = vec4(uColor, alpha);
+      }
+    `
   });
   const rainLines = new THREE.LineSegments(rainGeom, rainMat);
   rainLines.frustumCulled = false;
@@ -175,25 +209,28 @@ export function createWeatherAndEffects(
   group.add(rainLines);
 
   // =========================================================================
-  // 2. ANIMATED EXPANDING WET PUDDLE RIPPLES ON WIDER ROAD (y = 0.046)
+  // 2. SOFT CONCENTRIC EXPANDING WET PUDDLE RIPPLES ON ROAD (y = 0.045)
   // =========================================================================
   const rippleGroup = new THREE.Group();
   rippleGroup.name = 'PuddleRipples';
-  const rippleGeom = new THREE.RingGeometry(0.84, 1.0, 24);
+  const rippleTex = createRippleTexture();
+  const rippleGeom = new THREE.PlaneGeometry(1.0, 1.0);
   rippleGeom.rotateX(-Math.PI / 2);
 
   const ripples: RippleItem[] = [];
-  for (let i = 0; i < 32; i++) {
+  for (let i = 0; i < 34; i++) {
     const mat = new THREE.MeshBasicMaterial({
-      color: 0xcfe4f6,
+      map: rippleTex,
+      color: 0xa4c4de,
       transparent: true,
-      opacity: 0.25,
+      opacity: 0.13,
+      blending: THREE.AdditiveBlending,
       depthWrite: false
     });
     const mesh = new THREE.Mesh(rippleGeom, mat);
-    const rx = (rand() - 0.5) * 9.0;
-    const rz = (rand() - 0.5) * 28.0;
-    mesh.position.set(rx, 0.046, rz);
+    const rx = (rand() - 0.5) * 8.8;
+    const rz = (rand() - 0.5) * 26.0;
+    mesh.position.set(rx, 0.045, rz);
     mesh.renderOrder = 5;
     rippleGroup.add(mesh);
     ripples.push({
@@ -203,7 +240,7 @@ export function createWeatherAndEffects(
       z: rz,
       period: 1.15 + rand() * 1.15,
       phase: rand() * 4.0,
-      maxScale: 0.22 + rand() * 0.28
+      maxScale: 0.34 + rand() * 0.38
     });
   }
   group.add(rippleGroup);
@@ -437,6 +474,11 @@ export function createWeatherAndEffects(
     polygonOffsetFactor: 2,
     polygonOffsetUnits: 2
   });
+  applyRadialMistFade(xuanWarmTintMat, opts.mistUniforms, {
+    innerR: 17.0,
+    outerR: 25.0,
+    fadeAlpha: false
+  });
   const xuanCinnabarTintMat = new THREE.MeshBasicMaterial({
     color: 0xf3e4dc,
     polygonOffset: true,
@@ -446,6 +488,21 @@ export function createWeatherAndEffects(
   const inkPrussianMat = new THREE.LineBasicMaterial({ color: 0x1e3a5c, transparent: true, opacity: 0.84 });
   const inkPineSootMat = new THREE.LineBasicMaterial({ color: 0x262d34, transparent: true, opacity: 0.72 });
   const inkCinnabarMat = new THREE.LineBasicMaterial({ color: 0xb83b2e, transparent: true, opacity: 0.92 });
+  applyRadialMistFade(inkPrussianMat, opts.mistUniforms, {
+    innerR: 16.5,
+    outerR: 24.5,
+    fadeAlpha: true
+  });
+  applyRadialMistFade(inkPineSootMat, opts.mistUniforms, {
+    innerR: 16.0,
+    outerR: 24.0,
+    fadeAlpha: true
+  });
+  applyRadialMistFade(inkCinnabarMat, opts.mistUniforms, {
+    innerR: 17.5,
+    outerR: 25.5,
+    fadeAlpha: true
+  });
 
   const isInsideAncestor = (obj: THREE.Object3D, ancestor: THREE.Object3D): boolean => {
     let cur: THREE.Object3D | null = obj;
@@ -579,7 +636,7 @@ export function createWeatherAndEffects(
   };
 
   let currentViewMode: ViewMode = 'diorama';
-  let currentRainBaseOpacity = 0.14;
+  let currentRainBaseOpacity = 0.16;
 
   const setViewMode = (mode: ViewMode) => {
     currentViewMode = mode;
@@ -621,9 +678,9 @@ export function createWeatherAndEffects(
       for (const rp of ripples) {
         const t = (((simTime + rp.phase) % rp.period) + rp.period) % rp.period;
         const u = t / rp.period;
-        const sc = 0.05 + u * rp.maxScale;
+        const sc = 0.14 + u * rp.maxScale;
         rp.mesh.scale.set(sc, 1, sc);
-        rp.mat.opacity = Math.sin(u * Math.PI) * 0.26 * Math.min(1.5, currentRainBaseOpacity / 0.14);
+        rp.mat.opacity = Math.sin(u * Math.PI) * 0.13 * Math.min(1.45, currentRainBaseOpacity / 0.16);
       }
     }
 
@@ -755,7 +812,7 @@ export function createWeatherAndEffects(
     group,
     setRainOpacity: (opacity) => {
       currentRainBaseOpacity = opacity;
-      rainMat.opacity = opacity;
+      rainMat.uniforms.uOpacity.value = opacity;
     },
     setViewMode,
     triggerBellPulse,
