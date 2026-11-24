@@ -106,8 +106,12 @@ function boot(): void {
   const scene = new THREE.Scene();
 
   const FRUSTUM_SIZE = 32.8;
+  // Horizontal world span (incl. zoom 0.885) that keeps the tram stop on the left and the
+  // green tenement on the right inside the frame. Landscape screens already exceed it, so
+  // only portrait / near-square viewports grow the vertical frustum to honour it.
+  const MIN_VISIBLE_SPAN = 38.0;
   const computeFrustumSize = (asp: number): number =>
-    asp < 1.08 ? FRUSTUM_SIZE * Math.min(2.28, 1.12 / Math.max(0.42, asp)) : FRUSTUM_SIZE;
+    Math.max(FRUSTUM_SIZE, MIN_VISIBLE_SPAN / Math.max(0.42, asp));
 
   const aspect = window.innerWidth / Math.max(1, window.innerHeight);
   const initialFrustum = computeFrustumSize(aspect);

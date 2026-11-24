@@ -380,6 +380,41 @@ body.mode-print .hud-hint {
   }
 }
 
+/* Phones: wrap the dock into two centred rows (atmosphere + camera / modes + actions)
+   so every control stays visible instead of hiding behind a scrollbar-less overflow. */
+@media (max-width: 640px) {
+  .hud-dock {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 4px;
+    width: max-content;
+    border-radius: 20px;
+    overflow-x: visible;
+    bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .hud-group {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  /* The separator between the camera and mode groups becomes a hard line break. */
+  .hud-dock > .hud-sep:nth-child(4) {
+    flex-basis: 100%;
+    width: 100%;
+    height: 0;
+    margin: 0;
+    opacity: 0;
+  }
+}
+
+@media (max-width: 360px) {
+  .hud-dock > .hud-sep:not(:nth-child(4)) {
+    display: none;
+  }
+  .hud-title-sub {
+    letter-spacing: 0.02em !important;
+  }
+}
+
 @media (max-width: 480px) {
   .hud-key {
     display: none;
