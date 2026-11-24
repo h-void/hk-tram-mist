@@ -277,6 +277,45 @@ export class HKSoundscape {
     clickOsc.stop(startTime + 0.025);
   }
 
+  /**
+   * Brief polite dual-tone Hong Kong minibus / Crown Comfort taxi horn chirp
+   * triggered when clicking the green-roof minibus or parked red taxi.
+   */
+  public ringVehicleHorn(variant: 'minibus' | 'taxi' = 'taxi'): void {
+    if (!this.unlocked) {
+      this.unlockAndStart(false);
+    }
+    if (!this.ctx) return;
+    if (this.ctx.state === 'suspended') {
+      void this.ctx.resume();
+    }
+    const ctx = this.ctx;
+    const now = ctx.currentTime + 0.01;
+    const freqs = variant === 'minibus' ? [392, 494] : [440, 554];
+    const dur = variant === 'minibus' ? 0.16 : 0.12;
+
+    const bus = ctx.createGain();
+    bus.gain.setValueAtTime(0.0001, now);
+    bus.gain.linearRampToValueAtTime(0.085, now + 0.012);
+    bus.gain.setValueAtTime(0.085, now + dur - 0.03);
+    bus.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1450;
+    bus.connect(lp);
+    lp.connect(ctx.destination);
+
+    for (const f of freqs) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(f, now);
+      osc.connect(bus);
+      osc.start(now);
+      osc.stop(now + dur + 0.03);
+    }
+  }
+
   public dispose(): void {
     if (this.dropletTimer !== null) {
       window.clearInterval(this.dropletTimer);

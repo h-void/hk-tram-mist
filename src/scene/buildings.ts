@@ -46,6 +46,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
   const Y0 = 0.16; // Sidewalk top elevation
   const emissiveTracks: EmissiveTrack[] = [];
   const laundryTracks: LaundryTrack[] = [];
+  const spinTracks: Array<{ obj: THREE.Object3D; speed: number; phase: number }> = [];
   const neonPositions: THREE.Vector3[] = [];
   let beaconMat: THREE.MeshStandardMaterial | null = null;
 
@@ -3696,14 +3697,27 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       hLouvre.position.set(hx, roofY + 0.80, hz + 0.57);
       markTiny(hLouvre);
       b5.add(hLouvre);
-      // Top circular exhaust fan shroud + protective core
+      // Top circular exhaust fan shroud + visible spinning 4-blade industrial cooling fan!
       const fanShroud = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.40, 0.16, 14), darkSteelMat);
       fanShroud.position.set(hx, roofY + 1.26, hz);
       b5.add(fanShroud);
-      const fanCore = new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.30, 0.18, 12), acGrilleMat);
-      fanCore.position.set(hx, roofY + 1.26, hz);
+      const fanCore = new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.30, 0.08, 12), acGrilleMat);
+      fanCore.position.set(hx, roofY + 1.22, hz);
       markTiny(fanCore);
       b5.add(fanCore);
+
+      const fanRotor = markTiny(new THREE.Group());
+      fanRotor.position.set(hx, roofY + 1.31, hz);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.05, 8), brushedAluminumMat);
+      fanRotor.add(hub);
+      for (let bi = 0; bi < 4; bi++) {
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.015, 0.11), brushedAluminumMat);
+        blade.rotation.y = (bi * Math.PI) / 4;
+        blade.rotation.x = 0.22;
+        fanRotor.add(blade);
+      }
+      b5.add(fanRotor);
+      spinTracks.push({ obj: fanRotor, speed: hx < cx ? 7.8 : -6.4, phase: hx * 0.7 });
     }
 
     // Mechanical rooftop riser manifold + insulated sheet-metal ducts & chilled-water pipes connecting both chillers!
@@ -3751,6 +3765,42 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     group.add(b5);
   }
 
+  // =========================================================================
+  // 6. SPINNING STAINLESS HONG KONG ROOFTOP WHIRLYBIRD TURBINES (天台無動力風球)
+  // Mounted on B1 (金鳳冰室), B6 (永安樓) & B4 (便利店唐樓) rooftops catching rainy breeze!
+  // =========================================================================
+  {
+    const addRoofWhirlybird = (wx: number, wy: number, wz: number, speed: number, phase: number) => {
+      const wb = markTiny(new THREE.Group());
+      wb.position.set(wx, wy, wz);
+
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.17, 0.22, 10), brushedAluminumMat);
+      collar.position.y = 0.11;
+      wb.add(collar);
+
+      const rotor = new THREE.Group();
+      rotor.position.y = 0.32;
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(0.21, 10, 8), stainlessMat);
+      dome.scale.set(1, 0.82, 1);
+      rotor.add(dome);
+      for (let i = 0; i < 6; i++) {
+        const fin = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.22, 0.02), darkSteelMat);
+        fin.rotation.y = (i * Math.PI) / 6;
+        rotor.add(fin);
+      }
+      wb.add(rotor);
+      group.add(wb);
+      spinTracks.push({ obj: rotor, speed, phase });
+    };
+
+    // B1 金鳳冰室 rooftop terrace behind parapet (roofBaseY = 8.40)
+    addRoofWhirlybird(-9.45, Y0 + 8.38, 4.78, 3.6, 0.4);
+    // B6 永安樓 rooftop tin penthouse (roofY = 8.76 + 1.25)
+    addRoofWhirlybird(-14.85, Y0 + 9.85, -10.55, -4.2, 1.7);
+    // B4 便利店唐樓 open rooftop deck center (roofY = 10.46)
+    addRoofWhirlybird(14.55, Y0 + 10.30, -9.65, 3.1, 2.9);
+  }
+
   scene.add(group);
 
   let currentEmissiveScale = 1.15;
@@ -3782,6 +3832,11 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     for (const l of laundryTracks) {
       l.obj.rotation.x = l.baseRotX + Math.sin(simTime * 2.1 + l.phase) * 0.11;
       l.obj.rotation.z = Math.cos(simTime * 1.65 + l.phase * 1.3) * 0.06;
+    }
+
+    // Smooth continuous rotation on B5 HVAC chiller fans & rooftop stainless whirlybird turbines
+    for (const s of spinTracks) {
+      s.obj.rotation.y = simTime * s.speed + s.phase;
     }
 
     // Slow rhythmic red rooftop aviation beacon pulse on B3

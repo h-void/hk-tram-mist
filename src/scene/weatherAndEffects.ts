@@ -31,6 +31,7 @@ interface PetalSeed {
 
 interface BellPulse {
   origin: THREE.Vector3;
+  followTram: boolean;
   startTime: number;
   ringA: THREE.Mesh;
   ringB: THREE.Mesh;
@@ -50,11 +51,17 @@ interface SteamWisp {
   rotSpeed: number;
 }
 
+export interface BellPulseOptions {
+  followTram?: boolean;
+  colorA?: number;
+  colorB?: number;
+}
+
 export interface WeatherAndEffectsSystem {
   group: THREE.Group;
   setRainOpacity: (opacity: number) => void;
   setViewMode: (mode: ViewMode) => void;
-  triggerBellPulse: (origin: THREE.Vector3, simTime: number) => void;
+  triggerBellPulse: (origin: THREE.Vector3, simTime: number, pulseOpts?: BellPulseOptions) => void;
   update: (simTime: number, tramPos: THREE.Vector3, trainPos: THREE.Vector3) => void;
 }
 
@@ -425,7 +432,8 @@ export function createWeatherAndEffects(
   group.add(bellBurstGroup);
   const activeBellPulses: BellPulse[] = [];
 
-  const triggerBellPulse = (origin: THREE.Vector3, simTime: number) => {
+  const triggerBellPulse = (origin: THREE.Vector3, simTime: number, pulseOpts?: BellPulseOptions) => {
+    const followTram = pulseOpts?.followTram ?? true;
     const makeBellRing = (hex: number) => {
       const mat = new THREE.MeshBasicMaterial({
         color: hex,
@@ -442,10 +450,11 @@ export function createWeatherAndEffects(
       return { ring, mat };
     };
 
-    const a = makeBellRing(0xffdc78);
-    const b = makeBellRing(0xffa942);
+    const a = makeBellRing(pulseOpts?.colorA ?? 0xffdc78);
+    const b = makeBellRing(pulseOpts?.colorB ?? 0xffa942);
     activeBellPulses.push({
       origin: origin.clone(),
+      followTram,
       startTime: simTime,
       ringA: a.ring,
       ringB: b.ring,
@@ -453,6 +462,124 @@ export function createWeatherAndEffects(
       matB: b.mat
     });
   };
+
+  // =========================================================================
+  // 4B. GLIDING RAIN-MIST URBAN PIGEONS (雨霧飛鳥) & EAVE RAIN DRIPS (屋檐滴水)
+  // =========================================================================
+  const birdsGroup = new THREE.Group();
+  birdsGroup.name = 'RainMistPigeons';
+  const birdBodyMat = new THREE.MeshStandardMaterial({
+    color: 0xd8e2ec,
+    roughness: 0.70,
+    metalness: 0.05
+  });
+  const birdWingMat = new THREE.MeshStandardMaterial({
+    color: 0x465868,
+    roughness: 0.66,
+    side: THREE.DoubleSide
+  });
+
+  interface BirdEntry {
+    root: THREE.Group;
+    wingL: THREE.Group;
+    wingR: THREE.Group;
+    cx: number;
+    cz: number;
+    rx: number;
+    rz: number;
+    baseY: number;
+    speed: number;
+    phase: number;
+  }
+
+  const birds: BirdEntry[] = [];
+  const birdConfigs = [
+    { cx: -0.8, cz: -2.4, rx: 10.5, rz: 7.4, baseY: 11.4, speed: 0.24, phase: 0.4 },
+    { cx: -0.2, cz: -1.8, rx: 11.2, rz: 7.9, baseY: 11.8, speed: 0.24, phase: 0.62 },
+    { cx: 1.5, cz: -3.2, rx: 9.6, rz: 6.8, baseY: 10.7, speed: 0.24, phase: 0.86 }
+  ];
+
+  const wingGeom = new THREE.PlaneGeometry(0.35, 0.17);
+  for (const cfg of birdConfigs) {
+    const bRoot = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.ConeGeometry(0.068, 0.32, 6), birdBodyMat);
+    body.rotation.x = Math.PI / 2;
+    bRoot.add(body);
+
+    const wingL = new THREE.Group();
+    wingL.position.set(-0.035, 0.012, 0);
+    const wingLMesh = new THREE.Mesh(wingGeom, birdWingMat);
+    wingLMesh.rotation.x = -Math.PI / 2;
+    wingLMesh.position.set(-0.175, 0, 0);
+    wingL.add(wingLMesh);
+    bRoot.add(wingL);
+
+    const wingR = new THREE.Group();
+    wingR.position.set(0.035, 0.012, 0);
+    const wingRMesh = new THREE.Mesh(wingGeom, birdWingMat);
+    wingRMesh.rotation.x = -Math.PI / 2;
+    wingRMesh.position.set(0.175, 0, 0);
+    wingR.add(wingRMesh);
+    bRoot.add(wingR);
+
+    birdsGroup.add(bRoot);
+    birds.push({ root: bRoot, wingL, wingR, ...cfg });
+  }
+  group.add(birdsGroup);
+
+  // Delicate falling water beads dripping off 金鳳冰室 striped awning edge & elevated viaduct drain spouts
+  interface EaveDripSeed {
+    x: number;
+    yTop: number;
+    yBot: number;
+    z: number;
+    period: number;
+    phase: number;
+  }
+  const dripSeeds: EaveDripSeed[] = [];
+  // Cha Chaan Teng east & south striped awning edges (y = 2.86 -> 0.18)
+  for (let i = 0; i < 8; i++) {
+    dripSeeds.push({
+      x: -6.28,
+      yTop: 2.84,
+      yBot: 0.18,
+      z: 4.35 + i * 0.68,
+      period: 1.05 + rand() * 0.65,
+      phase: rand() * 2.0
+    });
+  }
+  for (let i = 0; i < 6; i++) {
+    dripSeeds.push({
+      x: -11.45 + i * 0.92,
+      yTop: 2.84,
+      yBot: 0.18,
+      z: 9.85,
+      period: 1.10 + rand() * 0.70,
+      phase: rand() * 2.0
+    });
+  }
+  // Viaduct south deck drainage spouts (y = 5.42 -> 0.06)
+  for (const vx of [-11.5, -5.2, 0.4, 5.1, 10.6, 15.8]) {
+    dripSeeds.push({
+      x: vx,
+      yTop: 5.42,
+      yBot: 0.08,
+      z: -1.72,
+      period: 1.25 + rand() * 0.65,
+      phase: rand() * 2.5
+    });
+  }
+
+  const dripMat = new THREE.MeshBasicMaterial({
+    color: 0xcfe4f6,
+    transparent: true,
+    opacity: 0.48,
+    depthWrite: false
+  });
+  const dripGeom = new THREE.CylinderGeometry(0.012, 0.018, 0.16, 5);
+  const eaveDripsInst = new THREE.InstancedMesh(dripGeom, dripMat, dripSeeds.length);
+  eaveDripsInst.renderOrder = 8;
+  group.add(eaveDripsInst);
 
   // =========================================================================
   // 5. [P] ARCHIVAL AXONOMETRIC PRINT MODE (Xuan Paper #F4EFE6 + Prussian/Pine/Cinnabar Ink)
@@ -647,6 +774,8 @@ export function createWeatherAndEffects(
     petalInst.visible = !isPrint;
     steamGroup.visible = !isPrint;
     bellBurstGroup.visible = !isPrint;
+    birdsGroup.visible = !isPrint;
+    eaveDripsInst.visible = !isPrint;
     buildOrShowPrintMode(isPrint);
   };
 
@@ -725,6 +854,45 @@ export function createWeatherAndEffects(
       }
     }
 
+    // 3C. Update gliding rain-mist urban pigeons (flap-and-glide bank above viaduct)
+    if (birdsGroup.visible) {
+      for (const b of birds) {
+        const ang = simTime * b.speed + b.phase;
+        const bx = b.cx + Math.cos(ang) * b.rx;
+        const bz = b.cz + Math.sin(ang) * b.rz;
+        const by = b.baseY + Math.sin(ang * 2.0 + b.phase) * 0.65;
+        const vx = -Math.sin(ang) * b.rx;
+        const vz = Math.cos(ang) * b.rz;
+        b.root.position.set(bx, by, bz);
+        b.root.rotation.set(0, Math.atan2(vx, vz), -0.18);
+        // Alternating brisk wingbeat bursts + soaring glide
+        const glideEnv = Math.max(0.18, Math.sin(simTime * 1.3 + b.phase * 3.0) * 0.5 + 0.5);
+        const flap = Math.sin(simTime * 11.5 + b.phase * 7.0) * 0.62 * glideEnv;
+        b.wingL.rotation.z = -flap;
+        b.wingR.rotation.z = flap;
+      }
+    }
+
+    // 3D. Update falling eave rain drips (gravity-accelerated droplets off awnings & viaduct spouts)
+    if (eaveDripsInst.visible) {
+      for (let i = 0; i < dripSeeds.length; i++) {
+        const d = dripSeeds[i];
+        const t = (((simTime + d.phase) % d.period) + d.period) % d.period;
+        const u = t / d.period;
+        // Brief hanging bead pause (0..0.28), then smooth quadratic gravity drop (0.28..1.0)
+        const fallU = u < 0.28 ? 0 : (u - 0.28) / 0.72;
+        const dy = d.yTop - fallU * fallU * (d.yTop - d.yBot);
+        dummy.position.set(d.x, dy, d.z);
+        dummy.rotation.set(0, 0, 0);
+        const sy = u < 0.28 ? 0.35 + u * 1.4 : 0.75 + fallU * 0.95;
+        const sxz = u < 0.28 ? 0.95 : 0.65;
+        dummy.scale.set(sxz, sy, sxz);
+        dummy.updateMatrix();
+        eaveDripsInst.setMatrixAt(i, dummy.matrix);
+      }
+      eaveDripsInst.instanceMatrix.needsUpdate = true;
+    }
+
     // 4. Update [A] Acoustic Field wavefront rings
     if (currentViewMode === 'acoustic') {
       for (const nw of neonWaveRings) {
@@ -776,17 +944,21 @@ export function createWeatherAndEffects(
         continue;
       }
 
+      const px = bp.followTram ? tramPos.x : bp.origin.x;
+      const py = bp.followTram ? 3.6 : bp.origin.y + 1.0;
+      const pz = bp.followTram ? tramPos.z : bp.origin.z;
+
       const uA = Math.min(1, Math.max(0, dtA / dur));
-      const rA = 0.45 + uA * 8.2;
-      bp.ringA.position.set(tramPos.x, 3.6 + uA * 0.5, tramPos.z);
+      const rA = 0.45 + uA * (bp.followTram ? 8.2 : 5.4);
+      bp.ringA.position.set(px, py + uA * 0.5, pz);
       bp.ringA.scale.set(rA, 1, rA);
       bp.matA.opacity = (1 - uA) * (1 - uA) * 0.92;
 
       if (dtB >= 0 && dtB <= dur) {
         const uB = dtB / dur;
-        const rB = 0.45 + uB * 7.8;
+        const rB = 0.45 + uB * (bp.followTram ? 7.8 : 5.0);
         bp.ringB.visible = true;
-        bp.ringB.position.set(tramPos.x, 3.9 + uB * 0.5, tramPos.z);
+        bp.ringB.position.set(px, py + 0.3 + uB * 0.5, pz);
         bp.ringB.scale.set(rB, 1, rB);
         bp.matB.opacity = (1 - uB) * (1 - uB) * 0.88;
       } else {
@@ -794,9 +966,10 @@ export function createWeatherAndEffects(
       }
     }
 
-    // 6. Keep dynamic vehicle edges synced during Print Mode if vehicles move
+    // 6. Keep dynamic vehicle & walking pedestrian edges synced during Print Mode
     if (printModeActive && printEdgesGroup) {
       opts.printTargetGroups.viaductAndVehicles.updateMatrixWorld(true);
+      opts.printTargetGroups.props.updateMatrixWorld(true);
       for (const ch of printEdgesGroup.children) {
         const src = ch.userData.sourceMesh as THREE.Mesh | undefined;
         if (src) {

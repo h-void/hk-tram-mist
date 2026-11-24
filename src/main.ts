@@ -320,18 +320,33 @@ function boot(): void {
     }
   });
 
-  // 7. Pointer Raycasting for Clicking & Hovering the Hero Double-Decker Tram
+  // 7. Pointer Raycasting for Clicking & Hovering Hero Vehicles (Tram #120, Green-Roof Minibus #28, Red Taxi)
   const raycaster = new THREE.Raycaster();
   const pointerNDC = new THREE.Vector2();
   let pointerDownPos = { x: 0, y: 0 };
 
-  const isPointerOverTram = (clientX: number, clientY: number): boolean => {
+  const getInteractiveVehicleAtPointer = (
+    clientX: number,
+    clientY: number
+  ): 'tram' | 'minibus' | 'taxi' | null => {
     const rect = renderer.domElement.getBoundingClientRect();
     pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointerNDC, camera);
-    const hits = raycaster.intersectObjects(viaductAndVehicles.tramGroup.children, true);
-    return hits.some((h) => Boolean(h.object.userData.isTram));
+    const hits = raycaster.intersectObjects(
+      [
+        viaductAndVehicles.tramGroup,
+        viaductAndVehicles.minibusGroup,
+        viaductAndVehicles.taxiGroup
+      ],
+      true
+    );
+    for (const h of hits) {
+      if (h.object.userData.isTram) return 'tram';
+      if (h.object.userData.isMinibus) return 'minibus';
+      if (h.object.userData.isTaxi) return 'taxi';
+    }
+    return null;
   };
 
   renderer.domElement.addEventListener('pointerdown', (e) => {
@@ -339,14 +354,33 @@ function boot(): void {
   });
 
   renderer.domElement.addEventListener('pointermove', (e) => {
-    const over = isPointerOverTram(e.clientX, e.clientY);
-    renderer.domElement.classList.toggle('pointer-hover', over);
+    const vehicle = getInteractiveVehicleAtPointer(e.clientX, e.clientY);
+    renderer.domElement.classList.toggle('pointer-hover', vehicle !== null);
   });
 
   renderer.domElement.addEventListener('pointerup', (e) => {
     const moved = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
-    if (moved < 6 && isPointerOverTram(e.clientX, e.clientY)) {
-      triggerTramBell();
+    if (moved < 6) {
+      const vehicle = getInteractiveVehicleAtPointer(e.clientX, e.clientY);
+      if (vehicle === 'tram') {
+        triggerTramBell();
+      } else if (vehicle === 'minibus') {
+        soundscape.ringVehicleHorn('minibus');
+        const p = viaductAndVehicles.minibusGroup.position;
+        weatherAndEffects.triggerBellPulse(new THREE.Vector3(p.x, 1.4, p.z), simTime, {
+          followTram: false,
+          colorA: 0x58e8a8,
+          colorB: 0xffd274
+        });
+      } else if (vehicle === 'taxi') {
+        soundscape.ringVehicleHorn('taxi');
+        const p = viaductAndVehicles.taxiGroup.position;
+        weatherAndEffects.triggerBellPulse(new THREE.Vector3(p.x, 0.8, p.z), simTime, {
+          followTram: false,
+          colorA: 0xff6b5c,
+          colorB: 0xffc864
+        });
+      }
     }
   });
 

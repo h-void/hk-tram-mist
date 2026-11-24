@@ -2906,3 +2906,177 @@ export function createHeritageDatePlaqueTexture(): THREE.CanvasTexture {
   return toTexture(canvas, { wrap: false });
 }
 
+/**
+ * Iconic Hong Kong 16-Seat Green-Roof Minibus (專線小巴) backlit destination placard
+ * ("28 銅鑼灣 CAUSEWAY BAY") mounted inside the front windscreen.
+ */
+export function createMinibusPlacardTexture(): {
+  map: THREE.CanvasTexture;
+  emissiveMap: THREE.CanvasTexture;
+} {
+  const W = 384;
+  const H = 128;
+  const [canvas, ctx] = makeCanvas(W, H);
+  const [eCanvas, eCtx] = makeCanvas(W, H);
+
+  ctx.fillStyle = '#f6f2e8';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#1b5e3c';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(3, 3, W - 6, H - 6);
+
+  // Left green route number badge ("28")
+  ctx.fillStyle = '#14663c';
+  ctx.fillRect(10, 10, 108, H - 20);
+  ctx.fillStyle = '#fff8e8';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  fitFontSize(ctx, '28', 800, 62, 34, HK_SANS, 92);
+  ctx.fillText('28', 64, H * 0.52);
+
+  // Right red traditional HK minibus hand-lettered destination ("銅鑼灣" + "CAUSEWAY BAY")
+  ctx.fillStyle = '#c22428';
+  fitFontSize(ctx, '銅 鑼 灣', 800, 48, 28, HK_SANS, 232);
+  ctx.fillText('銅 鑼 灣', 248, 48);
+
+  ctx.fillStyle = '#1d3c6a';
+  fitFontSize(ctx, 'CAUSEWAY BAY', 700, 22, 14, HK_SANS, 232);
+  ctx.fillText('CAUSEWAY BAY', 248, 94);
+
+  // Soft backlit acrylic emissive mask
+  eCtx.fillStyle = '#d8d0be';
+  eCtx.fillRect(8, 8, W - 16, H - 16);
+  eCtx.fillStyle = '#70b892';
+  eCtx.fillRect(10, 10, 108, H - 20);
+
+  return {
+    map: toTexture(canvas, { wrap: false }),
+    emissiveMap: toTexture(eCanvas, { wrap: false })
+  };
+}
+
+/**
+ * Iconic Hong Kong Green-Roof Public Light Bus (綠頂專線小巴) side livery texture.
+ */
+export function createMinibusSideTexture(): THREE.CanvasTexture {
+  const W = 512;
+  const H = 192;
+  const [canvas, ctx] = makeCanvas(W, H);
+
+  // Warm Hong Kong minibus cream-yellow lower body
+  ctx.fillStyle = '#ebe1c4';
+  ctx.fillRect(0, 0, W, H);
+
+  // Classic emerald-green horizontal beltline stripe
+  ctx.fillStyle = '#186a42';
+  ctx.fillRect(0, 56, W, 38);
+  ctx.fillStyle = '#114d30';
+  ctx.fillRect(0, 94, W, 6);
+
+  // Crisp gold/white "公共小型巴士 · 16 SEATS" lettering on the green belt
+  ctx.fillStyle = '#f4f0e0';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  fitFontSize(ctx, '公共小型巴士  PUBLIC LIGHT BUS  16', 700, 20, 12, HK_SANS, W - 44);
+  ctx.fillText('公共小型巴士  PUBLIC LIGHT BUS  16', W * 0.5, 76);
+
+  // Subtle lower panel seam lines & wheel-well shadow accents
+  ctx.strokeStyle = 'rgba(42, 46, 52, 0.28)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, 142);
+  ctx.lineTo(W, 142);
+  ctx.stroke();
+
+  // Gentle rain dirt splash along rocker skirt
+  const skirtGrad = ctx.createLinearGradient(0, 144, 0, H);
+  skirtGrad.addColorStop(0, 'rgba(34, 42, 50, 0.0)');
+  skirtGrad.addColorStop(1, 'rgba(28, 34, 40, 0.44)');
+  ctx.fillStyle = skirtGrad;
+  ctx.fillRect(0, 144, W, H - 144);
+
+  return toTexture(canvas, { wrap: false });
+}
+
+/**
+ * Illuminated Hong Kong Bus Stop Shelter Route 101 lightbox display panel (城巴/九巴 101 巴士站).
+ */
+export function createBusShelterMapTexture(): {
+  map: THREE.CanvasTexture;
+  emissiveMap: THREE.CanvasTexture;
+} {
+  const W = 256;
+  const H = 384;
+  const [canvas, ctx] = makeCanvas(W, H);
+  const [eCanvas, eCtx] = makeCanvas(W, H);
+
+  // Warm backlit cream transit poster panel
+  ctx.fillStyle = '#f2ede2';
+  ctx.fillRect(0, 0, W, H);
+
+  // Top crimson/amber Hong Kong cross-harbour route banner ("101 觀塘 ↔ 堅尼地城")
+  ctx.fillStyle = '#b9262c';
+  ctx.fillRect(0, 0, W, 86);
+  ctx.fillStyle = '#f7c538';
+  ctx.fillRect(0, 86, W, 10);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  fitFontSize(ctx, '101', 800, 44, 24, HK_SANS, 120);
+  ctx.fillText('101', 64, 44);
+
+  ctx.textAlign = 'left';
+  fitFontSize(ctx, '觀塘 — 堅尼地城', 700, 20, 13, HK_SANS, 126);
+  ctx.fillText('觀塘 — 堅尼地城', 120, 34);
+  ctx.fillStyle = '#fde6b8';
+  fitFontSize(ctx, 'CROSS HARBOUR', 700, 13, 10, HK_SANS, 126);
+  ctx.fillText('CROSS HARBOUR', 120, 62);
+
+  // Vertical transit stop diagram with 7 stop dots & station labels
+  ctx.strokeStyle = '#c83438';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(46, 122);
+  ctx.lineTo(46, 336);
+  ctx.stroke();
+
+  const stops = ['堅尼地城', '中環街市', '金鐘道', '灣仔道 (本站)', '紅磡海底隧道', '牛頭角', '觀塘裕民坊'];
+  stops.forEach((st, idx) => {
+    const sy = 126 + idx * 35;
+    const isHere = idx === 3;
+    ctx.fillStyle = isHere ? '#f7b924' : '#ffffff';
+    ctx.strokeStyle = isHere ? '#142230' : '#b9262c';
+    ctx.lineWidth = isHere ? 4 : 3;
+    ctx.beginPath();
+    ctx.arc(46, sy, isHere ? 9 : 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = isHere ? '#b9262c' : '#24303e';
+    ctx.textAlign = 'left';
+    fitFontSize(ctx, st, isHere ? 800 : 600, 16, 11, HK_SANS, 178);
+    ctx.fillText(st, 68, sy + 1);
+  });
+
+  // Bottom fare strip
+  ctx.fillStyle = '#1d2b3a';
+  ctx.fillRect(0, 352, W, 32);
+  ctx.fillStyle = '#e8f0f6';
+  ctx.textAlign = 'center';
+  fitFontSize(ctx, 'BUS STOP  巴士站  $12.1', 700, 14, 10, HK_SANS, W - 20);
+  ctx.fillText('BUS STOP  巴士站  $12.1', W * 0.5, 368);
+
+  // Emissive lightbox glow mask
+  eCtx.fillStyle = '#080808';
+  eCtx.fillRect(0, 0, W, H);
+  eCtx.fillStyle = '#c8c0b2';
+  eCtx.fillRect(8, 8, W - 16, H - 16);
+
+  return {
+    map: toTexture(canvas, { wrap: false }),
+    emissiveMap: toTexture(eCanvas, { wrap: false })
+  };
+}
+
+

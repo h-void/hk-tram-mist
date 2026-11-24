@@ -28,7 +28,7 @@ const LABELS = {
     soundOn: '雨聲開',
     soundOff: '靜音',
     lang: 'EN',
-    hint: '拖曳旋轉 · 滾輪縮放 · 點擊電車鳴鈴'
+    hint: '拖曳旋轉 · 滾輪縮放 · 點擊車輛鳴笛'
   },
   en: {
     title: 'TRAMLINE MIST',
@@ -46,7 +46,7 @@ const LABELS = {
     soundOn: 'Sound',
     soundOff: 'Muted',
     lang: '繁中',
-    hint: 'Drag orbit · Scroll zoom · Click tram for bell'
+    hint: 'Drag orbit · Scroll zoom · Click vehicles'
   }
 } as const;
 

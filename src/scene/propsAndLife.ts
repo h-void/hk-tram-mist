@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createSoftLightConeMaterial } from './atmosphere';
 import {
   createBauhiniaCanopyTexture,
+  createBusShelterMapTexture,
   createContactShadowTexture,
   createCorrugatedTinTexture,
   createFoliageCanopyTexture,
@@ -738,50 +739,101 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
       });
     }
 
+    // Iconic Hong Kong Ginger-White Street Cat (報紙檔屋頂橘白街貓) perched dry on kiosk roof, swishing tail!
+    {
+      const cat = markSkipPrintEdges(new THREE.Group());
+      cat.name = 'HK_KioskRoofCat';
+      cat.position.set(-0.24, 2.41, -0.08);
+      cat.rotation.set(0.12, -0.68, 0.04);
+
+      const gingerMat = new THREE.MeshStandardMaterial({ color: 0xd9843b, roughness: 0.85 });
+      const whiteFurMat = new THREE.MeshStandardMaterial({ color: 0xf4eee2, roughness: 0.86 });
+
+      const cBody = new THREE.Mesh(new THREE.SphereGeometry(0.145, 10, 8), gingerMat);
+      cBody.scale.set(0.88, 0.78, 1.32);
+      cBody.position.set(0, 0.11, 0);
+      cBody.castShadow = true;
+      cat.add(cBody);
+
+      const cChest = new THREE.Mesh(new THREE.SphereGeometry(0.105, 8, 8), whiteFurMat);
+      cChest.position.set(0, 0.11, 0.12);
+      cat.add(cChest);
+
+      const catHeadPivot = new THREE.Group();
+      catHeadPivot.position.set(0, 0.21, 0.15);
+      const cHead = new THREE.Mesh(new THREE.SphereGeometry(0.098, 10, 8), gingerMat);
+      catHeadPivot.add(cHead);
+      const cMuzzle = new THREE.Mesh(new THREE.SphereGeometry(0.046, 8, 6), whiteFurMat);
+      cMuzzle.position.set(0, -0.02, 0.08);
+      catHeadPivot.add(cMuzzle);
+      for (const ex of [-0.055, 0.055]) {
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.036, 0.072, 4), gingerMat);
+        ear.position.set(ex, 0.095, 0.01);
+        ear.rotation.z = ex < 0 ? 0.24 : -0.24;
+        catHeadPivot.add(ear);
+      }
+      cat.add(catHeadPivot);
+
+      const catTailPivot = new THREE.Group();
+      catTailPivot.position.set(0, 0.10, -0.17);
+      const tailCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0.08, -0.11),
+        new THREE.Vector3(0.04, 0.22, -0.15)
+      ]);
+      const cTail = new THREE.Mesh(new THREE.TubeGeometry(tailCurve, 8, 0.024, 6, false), gingerMat);
+      catTailPivot.add(cTail);
+      cat.add(catTailPivot);
+
+      kiosk.add(cat);
+      kiosk.userData.catHeadPivot = catHeadPivot;
+      kiosk.userData.catTailPivot = catTailPivot;
+    }
+
     group.add(kiosk);
   }
 
   // =========================================================================
-  // 2. HONG KONG TRAFFIC LIGHT & PEDESTRIAN CROSSING SIGNAL (交通燈 + 過路公仔燈)
+  // 2. LIVE CYCLING HONG KONG TRAFFIC LIGHT & PEDESTRIAN CROSSING SIGNAL (交通燈 + 閃動過路公仔燈)
   // Positioned right beside the zebra crossing (斑馬線): black/yellow striped pole,
   // 3-aspect vehicle head with white backing border & visors, glowing green walking man
-  // (綠公仔), and iconic yellow HK tactile pedestrian audio-button box!
+  // (綠公仔 -> 閃綠公仔 -> 紅公仔), and iconic yellow HK tactile pedestrian audio-button box!
   // =========================================================================
+  const pedSigTex = createPedSignalTexture();
+  const pedFaceMat = new THREE.MeshStandardMaterial({
+    map: pedSigTex.map,
+    emissive: new THREE.Color(0x52ffa8),
+    emissiveMap: pedSigTex.emissiveMap,
+    emissiveIntensity: 1.85,
+    roughness: 0.25
+  });
+  emissiveTracks.push({ mat: pedFaceMat, base: 1.85 });
+
+  const vehRedLitMat = new THREE.MeshStandardMaterial({
+    color: 0xff4640,
+    emissive: new THREE.Color(0xff2a24),
+    emissiveIntensity: 2.35,
+    roughness: 0.18
+  });
+  emissiveTracks.push({ mat: vehRedLitMat, base: 2.35 });
+
+  const vehAmberDimMat = new THREE.MeshStandardMaterial({
+    color: 0xffb838,
+    emissive: new THREE.Color(0xff9a18),
+    emissiveIntensity: 0.22,
+    roughness: 0.24
+  });
+  emissiveTracks.push({ mat: vehAmberDimMat, base: 0.22 });
+
+  const vehGreenDimMat = new THREE.MeshStandardMaterial({
+    color: 0x38e88c,
+    emissive: new THREE.Color(0x1ce078),
+    emissiveIntensity: 0.20,
+    roughness: 0.24
+  });
+  emissiveTracks.push({ mat: vehGreenDimMat, base: 0.20 });
+
   {
-    const pedSigTex = createPedSignalTexture();
-    const pedFaceMat = new THREE.MeshStandardMaterial({
-      map: pedSigTex.map,
-      emissive: new THREE.Color(0x52ffa8),
-      emissiveMap: pedSigTex.emissiveMap,
-      emissiveIntensity: 1.85,
-      roughness: 0.25
-    });
-    emissiveTracks.push({ mat: pedFaceMat, base: 1.85 });
-
-    const vehRedLitMat = new THREE.MeshStandardMaterial({
-      color: 0xff4640,
-      emissive: new THREE.Color(0xff2a24),
-      emissiveIntensity: 2.35,
-      roughness: 0.18
-    });
-    emissiveTracks.push({ mat: vehRedLitMat, base: 2.35 });
-
-    const vehAmberDimMat = new THREE.MeshStandardMaterial({
-      color: 0x5c4218,
-      emissive: new THREE.Color(0x7c5012),
-      emissiveIntensity: 0.25,
-      roughness: 0.28
-    });
-    emissiveTracks.push({ mat: vehAmberDimMat, base: 0.25 });
-
-    const vehGreenDimMat = new THREE.MeshStandardMaterial({
-      color: 0x164430,
-      emissive: new THREE.Color(0x145836),
-      emissiveIntensity: 0.22,
-      roughness: 0.28
-    });
-    emissiveTracks.push({ mat: vehGreenDimMat, base: 0.22 });
-
     const whiteBorderMat = new THREE.MeshStandardMaterial({
       color: 0xebeef2,
       roughness: 0.52
@@ -1184,6 +1236,41 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
 
     group.add(dpdGroup);
   }
+
+  // Iconic Hong Kong Swaying Red Plastic Dai Pai Dong Lampshade (街市紅燈罩) above folding table (-5.92, 0.55)
+  const dpdLampPivot = markSkipPrintEdges(new THREE.Group());
+  dpdLampPivot.name = 'HK_DaiPaiDong_RedLamp';
+  dpdLampPivot.position.set(-5.92, Y0 + 2.66, 0.55);
+  {
+    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.52, 6), darkMetalMat);
+    cord.position.y = -0.26;
+    dpdLampPivot.add(cord);
+
+    const redShadeMat = new THREE.MeshStandardMaterial({
+      color: 0xd6362e,
+      emissive: new THREE.Color(0xc83220),
+      emissiveIntensity: 0.72,
+      roughness: 0.36,
+      side: THREE.DoubleSide
+    });
+    emissiveTracks.push({ mat: redShadeMat, base: 0.72 });
+
+    const shade = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.16, 14, 1, true), redShadeMat);
+    shade.position.y = -0.54;
+    dpdLampPivot.add(shade);
+
+    const redBulbMat = new THREE.MeshStandardMaterial({
+      color: 0xfff2c4,
+      emissive: new THREE.Color(0xffbe54),
+      emissiveIntensity: 2.35,
+      roughness: 0.18
+    });
+    emissiveTracks.push({ mat: redBulbMat, base: 2.35 });
+    const dpdBulb = new THREE.Mesh(new THREE.SphereGeometry(0.068, 8, 6), redBulbMat);
+    dpdBulb.position.y = -0.60;
+    dpdLampPivot.add(dpdBulb);
+  }
+  group.add(dpdLampPivot);
 
   // =========================================================================
   // 5. CLASSIC HONG KONG ORANGE RUBBISH BINS (香港橙色垃圾桶)
@@ -1957,6 +2044,122 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     return umbGroup;
   };
 
+  // =========================================================================
+  // 9C. EAST UNDER-VIADUCT HONG KONG BUS STOP SHELTER (城巴/九巴 101 巴士站)
+  // Positioned cleanly at (6.95, -6.75) between Pier #3 (z=-3.8) and B5 (z=-8.8),
+  // facing the East northbound lane (x=5.1) with backlit Route 101 lightbox!
+  // =========================================================================
+  {
+    const busStop = new THREE.Group();
+    busStop.name = 'HK_BusStopShelter_101';
+    busStop.position.set(6.95, Y0, -6.75);
+
+    const bsGlassMat = new THREE.MeshStandardMaterial({
+      color: 0xaed4e6,
+      transparent: true,
+      opacity: 0.28,
+      roughness: 0.14,
+      metalness: 0.28,
+      depthWrite: false
+    });
+    const bsMapSet = createBusShelterMapTexture();
+    const bsMapMat = new THREE.MeshStandardMaterial({
+      map: bsMapSet.map,
+      emissive: new THREE.Color(0xf4e4c8),
+      emissiveMap: bsMapSet.emissiveMap,
+      emissiveIntensity: 0.54,
+      roughness: 0.30
+    });
+    emissiveTracks.push({ mat: bsMapMat, base: 0.54 });
+
+    // Slim dark-steel rear stanchions & cantilevered curved-edge rain roof
+    for (const pz of [-1.25, 0, 1.25]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.046, 2.38, 8), darkMetalMat);
+      post.position.set(0.58, 1.19, pz);
+      post.castShadow = true;
+      busStop.add(post);
+    }
+    const bsRoof = new THREE.Mesh(new THREE.BoxGeometry(1.56, 0.10, 2.96), darkMetalMat);
+    bsRoof.position.set(0.02, 2.40, 0);
+    bsRoof.rotation.z = 0.06;
+    bsRoof.castShadow = true;
+    busStop.add(bsRoof);
+
+    const bsBackGlass = markSkipPrintEdges(new THREE.Mesh(new THREE.PlaneGeometry(2.42, 1.85), bsGlassMat));
+    bsBackGlass.rotation.y = -Math.PI / 2;
+    bsBackGlass.position.set(0.54, 1.24, 0);
+    busStop.add(bsBackGlass);
+
+    // Backlit Route 101 Lightbox Display Panel on south end facing SE camera!
+    const lightbox = new THREE.Mesh(
+      new THREE.BoxGeometry(1.16, 1.72, 0.14),
+      [darkMetalMat, darkMetalMat, darkMetalMat, darkMetalMat, bsMapMat, bsMapMat]
+    );
+    lightbox.position.set(0.08, 1.24, 1.32);
+    lightbox.castShadow = true;
+    busStop.add(lightbox);
+
+    // Stainless lean-rail waiting bar inside shelter
+    const leanBar = markSkipPrintEdges(new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 1.95, 8), chromeSteelMat));
+    leanBar.rotation.x = Math.PI / 2;
+    leanBar.position.set(0.28, 0.72, -0.18);
+    busStop.add(leanBar);
+
+    group.add(busStop);
+    addRoundAO(6.95, -6.75, 1.35, 0.44);
+
+    // Standalone Hong Kong Bus Stop Flag Pole right at curb (5.65, -5.25)
+    const flagPole = new THREE.Group();
+    flagPole.position.set(5.65, Y0, -5.25);
+    const poleCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.036, 2.65, 8), chromeSteelMat);
+    poleCyl.position.y = 1.325;
+    poleCyl.castShadow = true;
+    flagPole.add(poleCyl);
+    const flagHead = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.48, 0.34),
+      new THREE.MeshStandardMaterial({
+        color: 0xd63638,
+        emissive: new THREE.Color(0xa62024),
+        emissiveIntensity: 0.35,
+        roughness: 0.36
+      })
+    );
+    flagHead.position.y = 2.42;
+    flagPole.add(flagHead);
+    const routeStrip = markSkipPrintEdges(
+      new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.28), safetyYellowMat)
+    );
+    routeStrip.position.y = 2.50;
+    flagPole.add(routeStrip);
+    group.add(flagPole);
+    addRoundAO(5.65, -5.25, 0.22, 0.40);
+  }
+
+  // =========================================================================
+  // 10. STYLED RAINY-DAY PEDESTRIANS (Articulated Walking Stride & Umbrellas!)
+  // =========================================================================
+  interface WalkPathSpec {
+    x0: number;
+    z0: number;
+    x1: number;
+    z1: number;
+    speed: number;
+    phase: number;
+    baseY?: number;
+    obeySignal?: boolean;
+  }
+
+  interface WalkerEntry {
+    root: THREE.Group;
+    legL: THREE.Group;
+    legR: THREE.Group;
+    armL: THREE.Object3D;
+    path: WalkPathSpec;
+    dist: number;
+  }
+
+  const animatedWalkers: WalkerEntry[] = [];
+
   interface PedestrianOpts {
     x: number;
     z: number;
@@ -1971,11 +2174,13 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     seated?: boolean;
     phase: number;
     skipAO?: boolean;
+    walkPath?: WalkPathSpec;
   }
 
   const addPedestrian = (opts: PedestrianOpts): THREE.Group => {
     const ped = new THREE.Group();
-    ped.position.set(opts.x, Y0, opts.z);
+    const baseY = opts.walkPath?.baseY ?? Y0;
+    ped.position.set(opts.x, baseY, opts.z);
     ped.rotation.y = opts.rotY;
 
     const coatMat = new THREE.MeshStandardMaterial({ color: opts.coatColor, roughness: 0.78 });
@@ -1984,17 +2189,27 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     const pantsMat = new THREE.MeshStandardMaterial({ color: 0x263240, roughness: 0.85 });
 
     const yOff = opts.seated ? -0.22 : 0;
+    let legLPivot: THREE.Group | null = null;
+    let legRPivot: THREE.Group | null = null;
 
     if (opts.seated) {
       const legs = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.34, 0.34), pantsMat);
       legs.position.set(0, 0.24, 0.14);
       ped.add(legs);
     } else {
-      for (const lx of [-0.072, 0.072]) {
+      for (const [lx, isLeft] of [
+        [-0.072, true],
+        [0.072, false]
+      ] as Array<[number, boolean]>) {
+        const hipPivot = new THREE.Group();
+        hipPivot.position.set(lx, 0.48, 0);
         const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.050, 0.044, 0.48, 8), pantsMat);
-        leg.position.set(lx, 0.24, 0);
+        leg.position.set(0, -0.24, 0);
         leg.castShadow = true;
-        ped.add(leg);
+        hipPivot.add(leg);
+        ped.add(hipPivot);
+        if (isLeft) legLPivot = hipPivot;
+        else legRPivot = hipPivot;
       }
     }
 
@@ -2106,10 +2321,36 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
       animatedUmbrellas.push({ obj: umb, phase: opts.phase, baseRotZ: tiltZ });
     }
 
-    group.add(ped);
-    if (!opts.seated && !opts.skipAO) {
+    // Dynamic ground shadow disc attached under walking figures so their shadow moves smoothly with them!
+    if (opts.walkPath && legLPivot && legRPivot) {
+      const walkAO = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.66, 0.66),
+        new THREE.MeshBasicMaterial({
+          map: roundShadowTex,
+          transparent: true,
+          opacity: 0.46,
+          depthWrite: false
+        })
+      );
+      walkAO.rotation.x = -Math.PI / 2;
+      walkAO.position.set(0, 0.014, 0);
+      walkAO.renderOrder = 2;
+      ped.add(walkAO);
+
+      const dist = Math.hypot(opts.walkPath.x1 - opts.walkPath.x0, opts.walkPath.z1 - opts.walkPath.z0);
+      animatedWalkers.push({
+        root: ped,
+        legL: legLPivot,
+        legR: legRPivot,
+        armL,
+        path: opts.walkPath,
+        dist: Math.max(0.1, dist)
+      });
+    } else if (!opts.seated && !opts.skipAO) {
       addRoundAO(opts.x, opts.z, 0.36, 0.48);
     }
+
+    group.add(ped);
     return ped;
   };
 
@@ -2233,14 +2474,77 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     phase: 2.1
   });
 
+  // 10. Commuter waiting for Route 101 under the East Under-Viaduct Bus Stop Shelter
+  addPedestrian({
+    x: 6.72,
+    z: -6.58,
+    rotY: -Math.PI * 0.45,
+    coatColor: 0x3e4b5c,
+    scarfColor: 0xd6b06a,
+    accessory: 'briefcase',
+    phase: 0.9
+  });
+
+  // 11. LIVE STROLLING WALKER A: strolling along the wide open Front-Left Bauhinia Promenade south of 金鳳冰室 (z = 10.45)
+  addPedestrian({
+    x: -8.2,
+    z: 10.45,
+    rotY: Math.PI * 0.5,
+    coatColor: 0x4b5664,
+    scarfColor: 0xe0aa54,
+    accessory: 'tote',
+    umbrellaColor: 0xdca446,
+    umbrellaOpacity: 0.78,
+    phase: 0.8,
+    walkPath: { x0: -13.2, z0: 10.45, x1: -6.65, z1: 10.45, speed: 0.74, phase: 0.38 }
+  });
+
+  // 12. LIVE STROLLING WALKER B: strolling along the wide open East Plaza Promenade between MTR Exit A3 & Telephone Booth (z = 4.48)
+  addPedestrian({
+    x: 12.9,
+    z: 4.48,
+    rotY: -Math.PI * 0.5,
+    coatColor: 0x2e4154,
+    scarfColor: 0xe6b676,
+    accessory: 'briefcase',
+    umbrellaColor: 0xc85a4a,
+    umbrellaOpacity: 0.76,
+    phase: 2.3,
+    walkPath: { x0: 8.65, z0: 4.48, x1: 14.65, z1: 4.48, speed: 0.76, phase: 0.36 }
+  });
+
+  // 13. LIVE CROSSING WALKER C: obeys the 14s HK pedestrian green man across the painted Zebra Crossing (z = 3.42)!
+  addPedestrian({
+    x: 3.63,
+    z: 3.42,
+    rotY: -Math.PI * 0.5,
+    coatColor: 0x6c3d46,
+    scarfColor: 0xebd2b0,
+    accessory: 'tote',
+    umbrellaColor: 0xf2d8e4,
+    umbrellaOpacity: 0.74,
+    phase: 4.7,
+    walkPath: { x0: 4.65, z0: 3.42, x1: -4.65, z1: 3.42, speed: 1.25, phase: 0.0, baseY: 0.04, obeySignal: true }
+  });
+
   scene.add(group);
 
+  // Locate roof cat pivots from the kiosk group for smooth tail & head animations
+  const kioskObj = group.getObjectByName('HK_NewspaperKiosk');
+  const catHeadPivot = (kioskObj?.userData.catHeadPivot as THREE.Group | undefined) ?? null;
+  const catTailPivot = (kioskObj?.userData.catTailPivot as THREE.Group | undefined) ?? null;
+
+  let currentEmissiveScale = 1.06;
   let printModeActive = false;
+
+  const pedGreenColor = new THREE.Color(0x52ffa8);
+  const pedRedColor = new THREE.Color(0xff4e42);
 
   return {
     group,
     bauhiniaCenters,
     setEmissiveScale: (scale) => {
+      currentEmissiveScale = scale;
       for (const e of emissiveTracks) {
         e.mat.emissiveIntensity = e.base * scale;
       }
@@ -2262,8 +2566,106 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
       }
     },
     update: (simTime) => {
+      // Shared 14-second Hong Kong Traffic Signal clock (+2.1s phase so hero t=0.25 sits warmly mid-green-man)
+      const sigClock = simTime + 2.1;
+      const sigT = ((sigClock % 14.0) + 14.0) % 14.0;
+
+      // 1. Rainy-breeze umbrella sway
       for (const u of animatedUmbrellas) {
         u.obj.rotation.z = u.baseRotZ + Math.sin(simTime * 1.45 + u.phase) * 0.045;
+      }
+
+      // 2. Articulated walking pedestrians (promenade strolls + signal-synced zebra crossing walker!)
+      for (const w of animatedWalkers) {
+        if (w.path.obeySignal) {
+          // Synced strictly to 14s HK pedestrian green window (0.85s..8.15s cross; rest waits politely at curb!)
+          const cycleIdx = Math.floor(sigClock / 14.0);
+          const forward = ((cycleIdx % 2) + 2) % 2 === 0;
+          const isCrossing = sigT >= 0.85 && sigT <= 8.15;
+          const rawU = sigT < 0.85 ? 0 : sigT > 8.15 ? 1 : (sigT - 0.85) / 7.30;
+          const smoothU = rawU * rawU * (3 - 2 * rawU);
+          const t = forward ? smoothU : 1.0 - smoothU;
+          const px = THREE.MathUtils.lerp(w.path.x0, w.path.x1, t);
+          const pz = THREE.MathUtils.lerp(w.path.z0, w.path.z1, t);
+          const stepDir = Math.sign(w.path.x1 - w.path.x0) || 1;
+          // Face across the road both while crossing and while waiting politely at either curb
+          const faceDir = (sigT > 8.15 ? (forward ? -1 : 1) : forward ? 1 : -1) * stepDir;
+          const strideAmp = isCrossing ? Math.sin(rawU * Math.PI) : 0;
+          const stridePhase = simTime * 7.2 + 1.1;
+          const bob = Math.abs(Math.sin(stridePhase)) * 0.032 * strideAmp;
+
+          w.root.position.set(px, (w.path.baseY ?? Y0) + bob, pz);
+          w.root.rotation.y = faceDir > 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+          const legAng = Math.sin(stridePhase) * 0.36 * strideAmp;
+          w.legL.rotation.x = legAng;
+          w.legR.rotation.x = -legAng;
+          w.armL.rotation.x = -legAng * 0.55;
+        } else {
+          const cycleDur = (w.dist / w.path.speed) * 2.0;
+          const uCycle = (((simTime / cycleDur + w.path.phase) % 1.0) + 1.0) % 1.0;
+          const forward = uCycle < 0.5;
+          const t = forward ? uCycle * 2.0 : (1.0 - uCycle) * 2.0;
+          const px = THREE.MathUtils.lerp(w.path.x0, w.path.x1, t);
+          const pz = THREE.MathUtils.lerp(w.path.z0, w.path.z1, t);
+          const dx = forward ? w.path.x1 - w.path.x0 : w.path.x0 - w.path.x1;
+          const dz = forward ? w.path.z1 - w.path.z0 : w.path.z0 - w.path.z1;
+          const stridePhase = simTime * 6.4 + w.path.phase * 12.0;
+          const bob = Math.abs(Math.sin(stridePhase)) * 0.032;
+
+          w.root.position.set(px, (w.path.baseY ?? Y0) + bob, pz);
+          w.root.rotation.y = Math.atan2(dx, dz);
+          const legAng = Math.sin(stridePhase) * 0.34;
+          w.legL.rotation.x = legAng;
+          w.legR.rotation.x = -legAng;
+          w.armL.rotation.x = -legAng * 0.55;
+        }
+      }
+
+      // 3. Ginger-white Hong Kong street cat perched on newspaper kiosk roof
+      if (catTailPivot) {
+        catTailPivot.rotation.z = Math.sin(simTime * 2.2) * 0.32;
+        catTailPivot.rotation.x = Math.cos(simTime * 1.4) * 0.08;
+      }
+      if (catHeadPivot) {
+        catHeadPivot.rotation.y = Math.sin(simTime * 0.72) * 0.34;
+        catHeadPivot.rotation.x = Math.sin(simTime * 1.15) * 0.07;
+      }
+
+      // 4. Gently swaying red plastic Dai Pai Dong lampshade above noodle table
+      dpdLampPivot.rotation.z = Math.sin(simTime * 1.85 + 0.6) * 0.065;
+      dpdLampPivot.rotation.x = Math.cos(simTime * 1.42) * 0.045;
+
+      // 5. Authentic 14-second Hong Kong Traffic Signal & Flashing Green Man Cycle!
+      const sc = currentEmissiveScale;
+      if (sigT < 6.0) {
+        // Vehicle RED · Pedestrian STEADY GREEN MAN (hero pose at t = 0.25)
+        vehRedLitMat.emissiveIntensity = 2.35 * sc;
+        vehAmberDimMat.emissiveIntensity = 0.14 * sc;
+        vehGreenDimMat.emissiveIntensity = 0.12 * sc;
+        pedFaceMat.emissive.copy(pedGreenColor);
+        pedFaceMat.emissiveIntensity = 1.85 * sc;
+      } else if (sigT < 8.5) {
+        // Vehicle RED + AMBER (HK pre-green warning!) · Pedestrian 2.8 Hz FLASHING GREEN MAN!
+        vehRedLitMat.emissiveIntensity = 2.35 * sc;
+        vehAmberDimMat.emissiveIntensity = 2.05 * sc;
+        vehGreenDimMat.emissiveIntensity = 0.12 * sc;
+        const flashOn = Math.sin(simTime * Math.PI * 5.6) > 0;
+        pedFaceMat.emissive.copy(pedGreenColor);
+        pedFaceMat.emissiveIntensity = (flashOn ? 2.05 : 0.25) * sc;
+      } else if (sigT < 12.5) {
+        // Vehicle GREEN · Pedestrian RED MAN
+        vehRedLitMat.emissiveIntensity = 0.14 * sc;
+        vehAmberDimMat.emissiveIntensity = 0.14 * sc;
+        vehGreenDimMat.emissiveIntensity = 2.35 * sc;
+        pedFaceMat.emissive.copy(pedRedColor);
+        pedFaceMat.emissiveIntensity = 1.45 * sc;
+      } else {
+        // Vehicle AMBER · Pedestrian RED MAN
+        vehRedLitMat.emissiveIntensity = 0.14 * sc;
+        vehAmberDimMat.emissiveIntensity = 2.25 * sc;
+        vehGreenDimMat.emissiveIntensity = 0.12 * sc;
+        pedFaceMat.emissive.copy(pedRedColor);
+        pedFaceMat.emissiveIntensity = 1.45 * sc;
       }
     }
   };

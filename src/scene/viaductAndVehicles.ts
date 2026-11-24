@@ -7,6 +7,8 @@ import {
 import {
   createContactShadowTexture,
   createGlowSpriteTexture,
+  createMinibusPlacardTexture,
+  createMinibusSideTexture,
   createTaxiFaceTexture,
   createTaxiRoofSignTexture,
   createTramBillboardTexture,
@@ -18,6 +20,7 @@ export interface ViaductAndVehiclesSystem {
   tramGroup: THREE.Group;
   trainGroup: THREE.Group;
   taxiGroup: THREE.Group;
+  minibusGroup: THREE.Group;
   getTramPosition: () => THREE.Vector3;
   getTrainPosition: () => THREE.Vector3;
   getTramProximity: () => number;
@@ -2186,6 +2189,7 @@ export function createViaductAndVehicles(
   }
 
   // Iconic Single Centered Vintage Brass Headlamp (+Z front) with Curved Upper Visor + Soft Volumetric Beam
+  let tramWiperPivot: THREE.Group | null = null;
   {
     const hz = halfTL + 0.05;
     const housing = new THREE.Mesh(new THREE.CylinderGeometry(0.165, 0.18, 0.18, 14), tramBrassMat);
@@ -2215,13 +2219,13 @@ export function createViaductAndVehicles(
     lampVisor.position.set(0, 0.96, hz + 0.14);
     tramGroup.add(lampVisor);
 
-    // Front brass driver windshield wiper
-    const tramWiper = markSkipPrintEdges(
-      new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.34, 0.018), trainUnderMat)
-    );
-    tramWiper.position.set(-0.22, 1.56, halfTL + 0.01);
-    tramWiper.rotation.z = 0.25;
-    tramGroup.add(tramWiper);
+    // Front brass driver windshield wiper (articulated pivot at lower sill for live rain-sweep animation!)
+    tramWiperPivot = markSkipPrintEdges(new THREE.Group());
+    tramWiperPivot.position.set(-0.22, 1.38, halfTL + 0.015);
+    const tramWiperArm = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.36, 0.018), trainUnderMat);
+    tramWiperArm.position.set(0, 0.18, 0);
+    tramWiperPivot.add(tramWiperArm);
+    tramGroup.add(tramWiperPivot);
 
     // Classic Hong Kong tram driver side-view mirrors & upper corner amber marker lamps
     for (const side of [-1, 1]) {
@@ -2460,6 +2464,25 @@ export function createViaductAndVehicles(
     panto.add(pMicro);
     tramGroup.add(panto);
   }
+
+  // Periodic wet-catenary electrical micro-spark at Tram #120 brass bow collector (y = 5.31)
+  const pantoSparkMat = new THREE.SpriteMaterial({
+    map: glowTex,
+    color: 0x9ceeff,
+    transparent: true,
+    opacity: 0.0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+  const pantoSparkSprite = markSkipPrintEdges(new THREE.Sprite(pantoSparkMat));
+  pantoSparkSprite.position.set(0.06, 5.31, -0.18);
+  pantoSparkSprite.scale.set(0.85, 0.85, 1);
+  pantoSparkSprite.renderOrder = 10;
+  tramGroup.add(pantoSparkSprite);
+
+  const pantoSparkLight = new THREE.PointLight(0x88e6ff, 0, 5.5, 1.8);
+  pantoSparkLight.position.set(0.06, 5.22, -0.18);
+  tramGroup.add(pantoSparkLight);
 
   tramGroup.traverse((obj) => {
     obj.userData.isTram = true;
@@ -3032,30 +3055,374 @@ export function createViaductAndVehicles(
     group.add(bayGroup);
   }
 
+  taxiGroup.traverse((obj) => {
+    obj.userData.isTaxi = true;
+  });
   taxiGroup.position.set(7.5, 0.185, 11.6);
   taxiGroup.rotation.y = 0.0;
   group.add(taxiGroup);
 
+  // =========================================================================
+  // 6. ICONIC HONG KONG 16-SEAT GREEN-ROOF PUBLIC LIGHT BUS (綠頂專線小巴 28 · 銅鑼灣)
+  // Glides northbound (-Z) along the open East lane (x = +2.05) opposite Tram #120!
+  // =========================================================================
+  const minibusGroup = new THREE.Group();
+  minibusGroup.name = 'HK_GreenRoof_Minibus_28';
+
+  const mbCreamMat = new THREE.MeshStandardMaterial({
+    color: 0xede2c6,
+    roughness: 0.36,
+    metalness: 0.22
+  });
+  applyRadialMistFade(mbCreamMat, mistUniforms, vehicleFade);
+
+  const mbGreenRoofMat = new THREE.MeshStandardMaterial({
+    color: 0x166840,
+    roughness: 0.38,
+    metalness: 0.24
+  });
+  applyRadialMistFade(mbGreenRoofMat, mistUniforms, vehicleFade);
+
+  const mbSideMat = new THREE.MeshStandardMaterial({
+    map: createMinibusSideTexture(),
+    roughness: 0.38,
+    metalness: 0.22
+  });
+  applyRadialMistFade(mbSideMat, mistUniforms, vehicleFade);
+
+  const mbCabinGlowMat = new THREE.MeshStandardMaterial({
+    color: 0xffecd0,
+    emissive: new THREE.Color(0xffb866),
+    emissiveIntensity: 0.85,
+    roughness: 0.45
+  });
+  applyRadialMistFade(mbCabinGlowMat, mistUniforms, vehicleFade);
+  emissiveTracks.push({ mat: mbCabinGlowMat, base: 0.85 });
+
+  const mbWindowGlassMat = new THREE.MeshStandardMaterial({
+    color: 0x263a4c,
+    emissive: new THREE.Color(0xffc878),
+    emissiveIntensity: 0.30,
+    roughness: 0.12,
+    metalness: 0.38,
+    transparent: true,
+    opacity: 0.44
+  });
+  applyRadialMistFade(mbWindowGlassMat, mistUniforms, vehicleFade);
+  emissiveTracks.push({ mat: mbWindowGlassMat, base: 0.30 });
+
+  const mbPlacardSet = createMinibusPlacardTexture();
+  const mbPlacardMat = new THREE.MeshStandardMaterial({
+    map: mbPlacardSet.map,
+    emissive: new THREE.Color(0xfff0d4),
+    emissiveMap: mbPlacardSet.emissiveMap,
+    emissiveIntensity: 1.05,
+    roughness: 0.26
+  });
+  applyRadialMistFade(mbPlacardMat, mistUniforms, vehicleFade);
+  emissiveTracks.push({ mat: mbPlacardMat, base: 1.05 });
+
+  const mbMarkerAmberMat = new THREE.MeshStandardMaterial({
+    color: 0xffaa38,
+    emissive: new THREE.Color(0xff9220),
+    emissiveIntensity: 1.55,
+    roughness: 0.22
+  });
+  applyRadialMistFade(mbMarkerAmberMat, mistUniforms, vehicleFade);
+  emissiveTracks.push({ mat: mbMarkerAmberMat, base: 1.55 });
+
+  const mbTireMat = new THREE.MeshStandardMaterial({ color: 0x191f25, roughness: 0.85 });
+  applyRadialMistFade(mbTireMat, mistUniforms, vehicleFade);
+
+  const mbAO = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.3, 4.9),
+    new THREE.MeshBasicMaterial({
+      map: shadowTex,
+      transparent: true,
+      opacity: 0.66,
+      depthWrite: false
+    })
+  );
+  mbAO.rotation.x = -Math.PI / 2;
+  mbAO.position.set(0, 0.038, 0);
+  mbAO.renderOrder = 3;
+  minibusGroup.add(mbAO);
+
+  // Minibus faces -Z (northbound); length = 4.10m (z in [-2.05, +2.05]), width = 1.60m, height = 2.26m
+  const mbW = 1.60;
+  const mbL = 4.10;
+  const mbHalfL = mbL * 0.5;
+  const mbHalfW = mbW * 0.5;
+
+  // Lower cream-yellow & emerald-stripe Coaster body
+  const mbLower = new THREE.Mesh(
+    new THREE.BoxGeometry(mbW, 0.90, mbL),
+    [mbSideMat, mbSideMat, mbCreamMat, trainUnderMat, mbCreamMat, mbCreamMat]
+  );
+  mbLower.position.set(0, 0.78, 0);
+  mbLower.castShadow = true;
+  mbLower.receiveShadow = true;
+  minibusGroup.add(mbLower);
+
+  // Signature emerald-green lower wrap-around rear waist stripe + HK yellow rear license plate on +Z tailgate!
+  const mbRearStripe = markSkipPrintEdges(new THREE.Mesh(new THREE.BoxGeometry(mbW + 0.01, 0.22, 0.02), mbGreenRoofMat));
+  mbRearStripe.position.set(0, 0.96, mbHalfL + 0.006);
+  minibusGroup.add(mbRearStripe);
+
+  const mbRearPlate = markSkipPrintEdges(
+    new THREE.Mesh(
+      new THREE.BoxGeometry(0.46, 0.13, 0.025),
+      new THREE.MeshStandardMaterial({
+        color: 0xf4c830,
+        emissive: new THREE.Color(0xc49418),
+        emissiveIntensity: 0.26,
+        roughness: 0.42
+      })
+    )
+  );
+  mbRearPlate.position.set(0, 0.58, mbHalfL + 0.015);
+  minibusGroup.add(mbRearPlate);
+
+  // Warm illuminated passenger interior core + dark passenger silhouettes visible through panoramic windows!
+  const mbInnerCore = markSkipPrintEdges(new THREE.Mesh(new THREE.BoxGeometry(mbW - 0.26, 0.68, mbL - 0.52), mbCabinGlowMat));
+  mbInnerCore.position.set(0, 1.54, 0.04);
+  minibusGroup.add(mbInnerCore);
+
+  for (const pz of [-0.92, -0.22, 0.48, 1.15]) {
+    for (const px of [-0.36, 0.36]) {
+      if (pz < -0.5 && px < 0) continue; // open door stairwell
+      const pSil = markSkipPrintEdges(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.42, 7), trainRubberMat));
+      pSil.position.set(px, 1.44, pz);
+      minibusGroup.add(pSil);
+      const pHead = markSkipPrintEdges(new THREE.Mesh(new THREE.SphereGeometry(0.095, 7, 6), trainRubberMat));
+      pHead.position.set(px, 1.72, pz);
+      minibusGroup.add(pHead);
+    }
+  }
+
+  // Dark-framed upper panoramic window band + slim cream pillars
+  const mbGlassShell = new THREE.Mesh(new THREE.BoxGeometry(mbW - 0.04, 0.72, mbL - 0.14), mbWindowGlassMat);
+  mbGlassShell.position.set(0, 1.56, 0);
+  minibusGroup.add(mbGlassShell);
+
+  for (const side of [-1, 1]) {
+    for (const pz of [-1.96, -1.05, -0.15, 0.75, 1.96]) {
+      const pillar = markSkipPrintEdges(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.76, 0.09), mbCreamMat));
+      pillar.position.set(side * (mbHalfW - 0.02), 1.56, pz);
+      minibusGroup.add(pillar);
+    }
+  }
+
+  // Signature Hong Kong Emerald-Green Vaulted Roof Cap + Roof AC Pod + Twin Amber Roof Clearance Lamps!
+  const mbRoof = new THREE.Mesh(new THREE.BoxGeometry(mbW + 0.02, 0.24, mbL - 0.06), mbGreenRoofMat);
+  mbRoof.position.set(0, 2.04, 0);
+  mbRoof.castShadow = true;
+  mbRoof.receiveShadow = true;
+  minibusGroup.add(mbRoof);
+
+  const mbRoofCrown = new THREE.Mesh(new THREE.BoxGeometry(mbW - 0.18, 0.12, mbL - 0.32), mbGreenRoofMat);
+  mbRoofCrown.position.set(0, 2.20, 0.04);
+  minibusGroup.add(mbRoofCrown);
+
+  const mbAcPod = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.18, 1.38), mbCreamMat);
+  mbAcPod.position.set(0, 2.33, 0.12);
+  mbAcPod.castShadow = true;
+  minibusGroup.add(mbAcPod);
+
+  for (const side of [-1, 1]) {
+    const marker = markSkipPrintEdges(new THREE.Mesh(new THREE.SphereGeometry(0.042, 8, 6), mbMarkerAmberMat));
+    marker.position.set(side * 0.52, 2.16, -mbHalfL + 0.06);
+    minibusGroup.add(marker);
+  }
+
+  // Iconic Backlit "28 銅鑼灣 CAUSEWAY BAY" Placards on front windshield (-Z) & rear glass (+Z, visible from Hero camera!)
+  const mbPlacard = new THREE.Mesh(
+    new THREE.BoxGeometry(0.84, 0.28, 0.04),
+    [mbGreenRoofMat, mbGreenRoofMat, mbGreenRoofMat, mbGreenRoofMat, mbPlacardMat, mbPlacardMat]
+  );
+  mbPlacard.position.set(0, 1.34, -mbHalfL + 0.03);
+  minibusGroup.add(mbPlacard);
+
+  const mbRearPlacard = markSkipPrintEdges(
+    new THREE.Mesh(
+      new THREE.BoxGeometry(0.76, 0.24, 0.03),
+      [mbGreenRoofMat, mbGreenRoofMat, mbGreenRoofMat, mbGreenRoofMat, mbPlacardMat, mbGreenRoofMat]
+    )
+  );
+  mbRearPlacard.position.set(0, 1.72, mbHalfL - 0.04);
+  minibusGroup.add(mbRearPlacard);
+
+  // Twin animated front windshield wipers on the minibus nose (-Z)
+  const mbWipers: THREE.Group[] = [];
+  for (const wx of [-0.34, 0.26]) {
+    const wp = markSkipPrintEdges(new THREE.Group());
+    wp.position.set(wx, 1.24, -mbHalfL - 0.01);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.36, 0.018), trainUnderMat);
+    blade.position.set(0, 0.18, 0);
+    wp.add(blade);
+    minibusGroup.add(wp);
+    mbWipers.push(wp);
+  }
+
+  // Front grille, bumpers, twin headlamps (-Z nose), rear ruby tail lamps (+Z stern)
+  const mbGrille = markSkipPrintEdges(new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.22, 0.06), trainUnderMat));
+  mbGrille.position.set(0, 0.62, -mbHalfL - 0.01);
+  minibusGroup.add(mbGrille);
+
+  for (const bz of [-mbHalfL - 0.04, mbHalfL + 0.04]) {
+    const bmp = new THREE.Mesh(new THREE.BoxGeometry(mbW + 0.06, 0.16, 0.12), trainRubberMat);
+    bmp.position.set(0, 0.36, bz);
+    minibusGroup.add(bmp);
+  }
+
+  for (const side of [-1, 1]) {
+    const hl = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.14, 0.06), trainHeadMat);
+    hl.position.set(side * 0.56, 0.64, -mbHalfL - 0.02);
+    minibusGroup.add(hl);
+
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.26, 0.06), trainTailMat);
+    tl.position.set(side * 0.60, 0.72, mbHalfL + 0.02);
+    minibusGroup.add(tl);
+
+    // Side wing mirrors
+    const mMirror = markSkipPrintEdges(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.22, 0.09), trainUnderMat));
+    mMirror.position.set(side * (mbHalfW + 0.10), 1.48, -mbHalfL + 0.14);
+    minibusGroup.add(mMirror);
+  }
+
+  // Soft volumetric minibus headlight beam + wet-road amber & ruby reflection pools + moving warm PointLight
+  const mbBeamMat = createSoftLightConeMaterial(0xffe09a, 0.056);
+  softCones.push({ mat: mbBeamMat, baseOpacity: 0.056 });
+  const mbBeam = new THREE.Mesh(new THREE.ConeGeometry(1.15, 4.8, 20, 1, true), mbBeamMat);
+  mbBeam.rotation.x = Math.PI / 2 - 0.14;
+  mbBeam.position.set(0, 0.50, -mbHalfL - 2.32);
+  mbBeam.renderOrder = 6;
+  minibusGroup.add(mbBeam);
+
+  const mbHeadPoolMat = new THREE.MeshBasicMaterial({
+    map: glowTex,
+    color: 0xffd27a,
+    transparent: true,
+    opacity: 0.44,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+  spillMaterials.push({ mat: mbHeadPoolMat, baseOpacity: 0.44 });
+  const mbHeadPool = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 4.6), mbHeadPoolMat);
+  mbHeadPool.rotation.x = -Math.PI / 2;
+  mbHeadPool.position.set(0, 0.042, -mbHalfL - 2.20);
+  mbHeadPool.renderOrder = 4;
+  minibusGroup.add(mbHeadPool);
+
+  const mbTailPoolMat = new THREE.MeshBasicMaterial({
+    map: glowTex,
+    color: 0xff3b3b,
+    transparent: true,
+    opacity: 0.30,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+  spillMaterials.push({ mat: mbTailPoolMat, baseOpacity: 0.30 });
+  const mbTailPool = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 2.2), mbTailPoolMat);
+  mbTailPool.rotation.x = -Math.PI / 2;
+  mbTailPool.position.set(0, 0.042, mbHalfL + 1.15);
+  mbTailPool.renderOrder = 4;
+  minibusGroup.add(mbTailPool);
+
+  const mbHeadLight = new THREE.PointLight(0xffcf7a, 7.2, 9.0, 1.65);
+  mbHeadLight.position.set(0, 0.95, -mbHalfL - 1.25);
+  minibusGroup.add(mbHeadLight);
+  movingLights.push({ light: mbHeadLight, baseIntensity: 7.2 });
+
+  // 4 Rotating Minibus Wheels with silver steel hubs
+  const mbWheels: THREE.Group[] = [];
+  const mbTireGeom = new THREE.CylinderGeometry(0.30, 0.30, 0.20, 16);
+  const mbHubGeom = new THREE.CylinderGeometry(0.16, 0.16, 0.22, 10);
+  const mbSpokeGeom = new THREE.BoxGeometry(0.24, 0.04, 0.22);
+  for (const wz of [-1.24, 1.18]) {
+    for (const side of [-1, 1]) {
+      const wg = markSkipPrintEdges(new THREE.Group());
+      wg.position.set(side * (mbHalfW - 0.06), 0.30, wz);
+      const tMesh = new THREE.Mesh(mbTireGeom, mbTireMat);
+      tMesh.rotation.z = Math.PI / 2;
+      wg.add(tMesh);
+      const hMesh = new THREE.Mesh(mbHubGeom, taxiSilverMat);
+      hMesh.rotation.z = Math.PI / 2;
+      wg.add(hMesh);
+      const spk = new THREE.Mesh(mbSpokeGeom, trainUnderMat);
+      spk.rotation.y = Math.PI / 2;
+      wg.add(spk);
+      minibusGroup.add(wg);
+      mbWheels.push(wg);
+    }
+  }
+
+  minibusGroup.traverse((obj) => {
+    obj.userData.isMinibus = true;
+  });
+  minibusGroup.position.set(2.05, 0, 0.70);
+  group.add(minibusGroup);
+
   scene.add(group);
 
-  let currentTramZ = 5.6;
+  let currentTramZ = 5.65;
   let currentTrainX = 2.2;
+  let currentEmissiveScale = 1.06;
   let printModeActive = false;
 
   const update = (simTime: number) => {
-    const tramRange = 60.0;
-    const tramSpeed = 1.55;
-    const tramOffset = ((5.6 + 30.0 + simTime * tramSpeed) % tramRange + tramRange) % tramRange;
-    currentTramZ = tramOffset - 30.0;
+    // 1. Hero Double-Decker Tram #120 southbound on west track (x = -1.85), 28.0s period synced to 14s traffic signal!
+    const tramRange = 56.0;
+    const tramSpeed = 2.0;
+    const tramOffset = ((5.65 + 28.0 + simTime * tramSpeed) % tramRange + tramRange) % tramRange;
+    currentTramZ = tramOffset - 28.0;
     const tramSway = Math.sin(simTime * 4.2) * 0.008;
     tramGroup.position.set(-1.85, 0, currentTramZ);
     tramGroup.rotation.z = tramSway;
 
+    // Animated Tram #120 windshield rain wiper sweep
+    if (tramWiperPivot) {
+      tramWiperPivot.rotation.z = Math.sin(simTime * 4.4) * 0.56;
+    }
+
+    // Periodic crisp cyan electrical micro-spark at wet overhead catenary contact strip
+    const sparkCycle = ((simTime * 0.42 + 0.15) % 1.0 + 1.0) % 1.0;
+    const sparkBurst =
+      !printModeActive && sparkCycle > 0.92
+        ? Math.sin(((sparkCycle - 0.92) / 0.08) * Math.PI) *
+          (0.65 + 0.35 * Math.sin(simTime * 95.0))
+        : 0;
+    pantoSparkMat.opacity = sparkBurst * 0.92;
+    const sparkScale = 0.42 + sparkBurst * 0.75;
+    pantoSparkSprite.scale.set(sparkScale, sparkScale, 1);
+    pantoSparkLight.intensity = sparkBurst * 6.5;
+
+    // 2. Elevated Kowloon Metro-Cammell 2-Car Train eastbound on viaduct (z = -3.8)
     const trainRange = 68.0;
     const trainSpeed = 2.75;
     const trainOffset = ((2.2 + 34.0 + simTime * trainSpeed) % trainRange + trainRange) % trainRange;
     currentTrainX = trainOffset - 34.0;
     trainGroup.position.set(currentTrainX, 0, bridgeZ);
+
+    // 3. Green-Roof Hong Kong Public Light Bus #28 northbound on east lane (x = +2.05), 28.0s period synced to 14s signal!
+    const mbRange = 61.6;
+    const mbSpeed = -2.2;
+    const mbOffset = ((0.70 + 30.8 + simTime * mbSpeed) % mbRange + mbRange) % mbRange;
+    const currentMbZ = mbOffset - 30.8;
+    minibusGroup.position.set(2.05, 0, currentMbZ);
+    minibusGroup.rotation.z = Math.sin(simTime * 5.2) * 0.005;
+    const wheelAngle = (simTime * mbSpeed) / 0.30;
+    for (const w of mbWheels) {
+      w.rotation.x = wheelAngle;
+    }
+    const mbWiperAng = Math.sin(simTime * 5.4 + 0.4) * 0.52;
+    for (const wp of mbWipers) {
+      wp.rotation.z = mbWiperAng;
+    }
+
+    // 4. Parked Red Taxi gentle idling hazard/turn amber pulse
+    const taxiBlink = Math.sin(simTime * Math.PI * 2.2) > 0.15 ? 1.0 : 0.28;
+    taxiAmberMat.emissiveIntensity = 1.4 * currentEmissiveScale * taxiBlink;
   };
 
   update(0);
@@ -3065,11 +3432,13 @@ export function createViaductAndVehicles(
     tramGroup,
     trainGroup,
     taxiGroup,
+    minibusGroup,
     getTramPosition: () => new THREE.Vector3(-1.85, 2.2, currentTramZ),
     getTrainPosition: () => new THREE.Vector3(currentTrainX, railTopY + 1.2, bridgeZ),
     getTramProximity: () => Math.max(0, 1 - Math.abs(currentTramZ - 3.0) / 22.0),
     getTrainProximity: () => Math.max(0, 1 - Math.abs(currentTrainX - 1.0) / 24.0),
     setEmissiveScale: (scale) => {
+      currentEmissiveScale = scale;
       for (const e of emissiveTracks) {
         e.mat.emissiveIntensity = e.base * scale;
       }
@@ -3095,6 +3464,8 @@ export function createViaductAndVehicles(
       for (const l of movingLights) {
         l.light.visible = !enabled;
       }
+      pantoSparkSprite.visible = !enabled;
+      pantoSparkLight.visible = !enabled;
     },
     update
   };
