@@ -5,6 +5,7 @@ import {
   createContactShadowTexture,
   createCorrugatedTinTexture,
   createFacadeTextureSet,
+  createGlowSpriteTexture,
   createHeritageDatePlaqueTexture,
   createLouvreVentTexture,
   createMtrExitSignTexture,
@@ -21,6 +22,7 @@ export interface BuildingsSystem {
   group: THREE.Group;
   neonPositions: THREE.Vector3[];
   setEmissiveScale: (scale: number) => void;
+  setPrintMode: (enabled: boolean) => void;
   update: (simTime: number) => void;
 }
 
@@ -47,8 +49,12 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
   const emissiveTracks: EmissiveTrack[] = [];
   const laundryTracks: LaundryTrack[] = [];
   const spinTracks: Array<{ obj: THREE.Object3D; speed: number; phase: number }> = [];
+  const haloTracks: Array<{ sprite: THREE.Sprite; mat: THREE.SpriteMaterial; baseOpacity: number; phase: number }> = [];
   const neonPositions: THREE.Vector3[] = [];
   let beaconMat: THREE.MeshStandardMaterial | null = null;
+  let scaffoldBeaconMat: THREE.MeshStandardMaterial | null = null;
+  let scaffoldBeaconHalo: THREE.SpriteMaterial | null = null;
+  let scaffoldBeaconSprite: THREE.Sprite | null = null;
 
   // Tag tiny decorative sub-meshes so [P] Print Mode skips noisy ink edges on micro-details
   const markTiny = <T extends THREE.Object3D>(obj: T): T => {
@@ -60,6 +66,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
 
   // Shared procedural textures
   const rectShadowTex = createContactShadowTexture('rect');
+  const glowSpriteTex = createGlowSpriteTexture();
   const concreteRoofTex = createConcreteRoofTexture(404);
   const darkRoofTileTex = createRoofTileTexture('#2d4050', 91);
   const blueRoofTileTex = createRoofTileTexture('#34525c', 117);
@@ -433,6 +440,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
           );
           sill.position.set(0, -winH * 0.5 - 0.035, 0.065);
           sill.castShadow = true;
+          markTiny(sill);
           winNode.add(sill);
 
           // 3. Slim recessed dark-steel side reveal moldings
@@ -608,6 +616,65 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     board.rotation.y = opts.rotY;
     board.castShadow = true;
     signGroup.add(board);
+
+    // 3D Glowing Glass Neon Perimeter Trim Tubes hugging both faces of the projecting sign!
+    const tubeMat = new THREE.MeshStandardMaterial({
+      color: opts.emissiveHex,
+      emissive: new THREE.Color(opts.emissiveHex),
+      emissiveIntensity: opts.baseIntensity * 1.15,
+      roughness: 0.18,
+      metalness: 0.08
+    });
+    emissiveTracks.push({
+      mat: tubeMat,
+      baseIntensity: opts.baseIntensity * 1.15,
+      flickerPhase: opts.flickerPhase,
+      flickerAmp: opts.flickerPhase !== undefined ? 0.12 : 0.04
+    });
+
+    const tubeRim = new THREE.Group();
+    tubeRim.rotation.y = opts.rotY;
+    const tr = 0.015;
+    const tw = Math.max(0.18, opts.width - 0.05);
+    const th = Math.max(0.18, opts.height - 0.05);
+    for (const faceSign of [-1, 1]) {
+      const fz = faceSign * 0.082;
+      for (const hy of [-th * 0.5, th * 0.5]) {
+        const hTube = new THREE.Mesh(new THREE.CylinderGeometry(tr, tr, tw, 6), tubeMat);
+        hTube.rotation.z = Math.PI / 2;
+        hTube.position.set(0, hy, fz);
+        tubeRim.add(hTube);
+      }
+      for (const vx of [-tw * 0.5, tw * 0.5]) {
+        const vTube = new THREE.Mesh(new THREE.CylinderGeometry(tr, tr, th, 6), tubeMat);
+        vTube.position.set(vx, 0, fz);
+        tubeRim.add(vTube);
+      }
+    }
+    markTiny(tubeRim);
+    signGroup.add(tubeRim);
+
+    // Soft Volumetric Monsoon Mist Halo glowing gently around every Hong Kong neon sign
+    const haloMat = new THREE.SpriteMaterial({
+      map: glowSpriteTex,
+      color: new THREE.Color(opts.emissiveHex),
+      transparent: true,
+      opacity: 0.24,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const haloSprite = new THREE.Sprite(haloMat);
+    const haloSpan = Math.max(opts.width, opts.height) * 2.15 + 1.15;
+    haloSprite.scale.set(haloSpan, haloSpan * 0.92, 1);
+    haloSprite.renderOrder = 6;
+    markTiny(haloSprite);
+    signGroup.add(haloSprite);
+    haloTracks.push({
+      sprite: haloSprite,
+      mat: haloMat,
+      baseOpacity: 0.24,
+      phase: opts.flickerPhase ?? 0
+    });
 
     // Multi-bar 3D diagonal steel lattice truss + wall anchor plates + grey transformer box (牛箱)
     const truss = new THREE.Group();
@@ -1836,6 +1903,76 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     southNet.position.set(sMidX, scaffY0 + 2.02, scaffSouthZ - 0.04);
     markTiny(southNet);
     scaffGroup.add(southNet);
+
+    // Classic Hong Kong Bamboo-Scaffold Corner Flashing Amber Warning Lamp (地盤閃燈) + Bilingual Caution Banner
+    {
+      const beaconGroup = markTiny(new THREE.Group());
+      beaconGroup.position.set(scaffEastX + 0.04, ledgerYs[1] + 0.16, scaffSouthZ + 0.04);
+
+      const lampBody = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.14), new THREE.MeshStandardMaterial({ color: 0xe6b422, roughness: 0.45 }));
+      beaconGroup.add(lampBody);
+
+      scaffoldBeaconMat = new THREE.MeshStandardMaterial({
+        color: 0xffb830,
+        emissive: new THREE.Color(0xff9418),
+        emissiveIntensity: 2.2,
+        roughness: 0.18
+      });
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.068, 0.12, 10), scaffoldBeaconMat);
+      lens.position.y = 0.14;
+      beaconGroup.add(lens);
+
+      scaffoldBeaconHalo = new THREE.SpriteMaterial({
+        map: glowSpriteTex,
+        color: new THREE.Color(0xffa428),
+        transparent: true,
+        opacity: 0.45,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      scaffoldBeaconSprite = new THREE.Sprite(scaffoldBeaconHalo);
+      scaffoldBeaconSprite.position.y = 0.14;
+      scaffoldBeaconSprite.scale.set(1.25, 1.25, 1);
+      scaffoldBeaconSprite.renderOrder = 7;
+      beaconGroup.add(scaffoldBeaconSprite);
+
+      // Crisp yellow-and-black Hong Kong bilingual scaffolding safety sign (小心高空工作 / CAUTION)
+      const warnCanvas = document.createElement('canvas');
+      warnCanvas.width = 256;
+      warnCanvas.height = 96;
+      const wCtx = warnCanvas.getContext('2d')!;
+      wCtx.fillStyle = '#e8b924';
+      wCtx.fillRect(0, 0, 256, 96);
+      wCtx.strokeStyle = '#181c20';
+      wCtx.lineWidth = 8;
+      wCtx.strokeRect(4, 4, 248, 88);
+      wCtx.fillStyle = '#181c20';
+      wCtx.fillRect(10, 10, 236, 40);
+      wCtx.textAlign = 'center';
+      wCtx.textBaseline = 'middle';
+      wCtx.fillStyle = '#f8d24a';
+      wCtx.font = "800 24px 'Noto Sans CJK HK', 'PingFang HK', sans-serif";
+      wCtx.fillText('小心高空工作', 128, 31);
+      wCtx.fillStyle = '#181c20';
+      wCtx.font = "800 18px 'Noto Sans CJK HK', sans-serif";
+      wCtx.fillText('CAUTION · OVERHEAD WORK', 128, 70);
+      const warnTex = new THREE.CanvasTexture(warnCanvas);
+      warnTex.colorSpace = THREE.SRGBColorSpace;
+      warnTex.anisotropy = 4;
+
+      const warnMat = new THREE.MeshStandardMaterial({
+        map: warnTex,
+        roughness: 0.55,
+        side: THREE.DoubleSide
+      });
+      const warnPlate = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.36), warnMat);
+      warnPlate.rotation.y = Math.PI / 2;
+      warnPlate.position.set(scaffEastX + 0.045, ledgerYs[0] + 0.44, eMidZ + 0.35);
+      markTiny(warnPlate);
+      scaffGroup.add(warnPlate);
+
+      scaffGroup.add(beaconGroup);
+    }
 
     b2.add(scaffGroup);
 
@@ -3133,6 +3270,63 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     markTiny(shedDoor);
     b4.add(shedDoor);
 
+    // Warm glowing iron-grilled rooftop shack window (天台屋暖光窗) + rooftop bamboo laundry rack!
+    const b4ShackWinMat = new THREE.MeshStandardMaterial({
+      color: 0xffdf9a,
+      emissive: new THREE.Color(0xffa43c),
+      emissiveIntensity: 1.35,
+      roughness: 0.32
+    });
+    emissiveTracks.push({ mat: b4ShackWinMat, baseIntensity: 1.35 });
+    const b4ShackWin = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.50, 0.05), b4ShackWinMat);
+    b4ShackWin.position.set(cx + 1.56, roofY + 0.82, cz - 0.03);
+    markTiny(b4ShackWin);
+    b4.add(b4ShackWin);
+
+    const b4ShackFrame = markTiny(new THREE.Group());
+    b4ShackFrame.position.set(cx + 1.56, roofY + 0.82, cz - 0.005);
+    for (const fx of [-0.38, 0, 0.38]) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.54, 0.05), darkSteelMat);
+      m.position.x = fx;
+      b4ShackFrame.add(m);
+    }
+    for (const fy of [-0.25, 0.25]) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.80, 0.03, 0.05), darkSteelMat);
+      m.position.y = fy;
+      b4ShackFrame.add(m);
+    }
+    b4.add(b4ShackFrame);
+
+    // Rooftop bamboo clothes-drying rack with 3 swaying garments
+    {
+      const rack = markTiny(new THREE.Group());
+      rack.position.set(cx - 0.65, roofY + 0.04, cz + 0.35);
+      for (const rx of [-0.72, 0.72]) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 1.15, 6), darkSteelMat);
+        post.position.set(rx, 0.575, 0);
+        rack.add(post);
+      }
+      const linePole = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.020, 1.56, 6), bambooMat);
+      linePole.rotation.z = Math.PI / 2;
+      linePole.position.set(0, 1.06, 0);
+      rack.add(linePole);
+
+      const b4Clothes = [0xe8dfce, 0x6ea4c4, 0xd86e5c];
+      b4Clothes.forEach((hex, ci) => {
+        const piv = new THREE.Group();
+        piv.position.set(-0.42 + ci * 0.42, 1.04, 0);
+        const garment = new THREE.Mesh(
+          new THREE.BoxGeometry(0.24, 0.36 - ci * 0.03, 0.03),
+          new THREE.MeshStandardMaterial({ color: hex, roughness: 0.88 })
+        );
+        garment.position.y = -0.18;
+        piv.add(garment);
+        rack.add(piv);
+        laundryTracks.push({ obj: piv, phase: 2.8 + ci * 1.1, baseRotX: 0 });
+      });
+      b4.add(rack);
+    }
+
     // Galvanized rooftop water tank on concrete plinth
     const b4Tank = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.96, 12), tankSteelMat);
     b4Tank.position.set(cx - 1.75, roofY + 0.64, cz - 1.45);
@@ -3804,12 +3998,33 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
   scene.add(group);
 
   let currentEmissiveScale = 1.15;
+  let printModeActive = false;
+
+  const syncHalos = () => {
+    const haloScale = printModeActive ? 0 : Math.max(0.25, (currentEmissiveScale - 0.35) * 1.05);
+    for (const h of haloTracks) {
+      h.sprite.visible = !printModeActive;
+      h.mat.opacity = h.baseOpacity * haloScale;
+    }
+    if (scaffoldBeaconSprite && scaffoldBeaconHalo) {
+      scaffoldBeaconSprite.visible = !printModeActive;
+      if (printModeActive) {
+        scaffoldBeaconHalo.opacity = 0;
+      }
+    }
+  };
 
   const setEmissiveScale = (scale: number) => {
     currentEmissiveScale = scale;
     for (const track of emissiveTracks) {
       track.mat.emissiveIntensity = track.baseIntensity * currentEmissiveScale;
     }
+    syncHalos();
+  };
+
+  const setPrintMode = (enabled: boolean) => {
+    printModeActive = enabled;
+    syncHalos();
   };
 
   const update = (simTime: number) => {
@@ -3825,6 +4040,15 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
           0.2,
           track.baseIntensity * currentEmissiveScale * (1.0 + wave - Math.abs(flutter))
         );
+      }
+    }
+
+    // Humid monsoon mist glow breathing softly around projecting neon signs
+    if (!printModeActive) {
+      const haloScale = Math.max(0.22, (currentEmissiveScale - 0.35) * 1.05);
+      for (const h of haloTracks) {
+        const breath = 0.90 + 0.10 * Math.sin(simTime * 2.4 + h.phase);
+        h.mat.opacity = h.baseOpacity * haloScale * breath;
       }
     }
 
@@ -3844,12 +4068,22 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       const pulse = 0.25 + 0.75 * Math.pow(0.5 + 0.5 * Math.sin(simTime * 2.6), 4);
       beaconMat.emissiveIntensity = (0.65 + 2.8 * pulse) * Math.max(0.55, currentEmissiveScale);
     }
+
+    // Authentic Hong Kong bamboo-scaffold corner amber construction warning lamp (~1.3 Hz pulse)
+    if (scaffoldBeaconMat && scaffoldBeaconHalo) {
+      const sPulse = Math.pow(0.5 + 0.5 * Math.sin(simTime * Math.PI * 2.4 + 0.7), 3);
+      scaffoldBeaconMat.emissiveIntensity = (0.35 + 2.45 * sPulse) * Math.max(0.60, currentEmissiveScale);
+      scaffoldBeaconHalo.opacity = printModeActive
+        ? 0
+        : (0.08 + 0.42 * sPulse) * Math.max(0.35, currentEmissiveScale * 0.85);
+    }
   };
 
   return {
     group,
     neonPositions,
     setEmissiveScale,
+    setPrintMode,
     update
   };
 }

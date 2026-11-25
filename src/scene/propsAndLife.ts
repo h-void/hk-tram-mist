@@ -342,7 +342,7 @@ function createNewspaperBundleTexture(): THREE.CanvasTexture {
 }
 
 /**
- * Generates an organically perturbed low-poly foliage puff geometry (no glossy plastic spheres!).
+ * Generates an organically perturbed flattened botanical frond cluster (airy Hong Kong canopy silhouette).
  */
 function createOrganicFoliageGeometry(radius: number, seed: number): THREE.BufferGeometry {
   const geom = new THREE.IcosahedronGeometry(radius, 2);
@@ -351,10 +351,10 @@ function createOrganicFoliageGeometry(radius: number, seed: number): THREE.Buffe
     const vx = pos.getX(i);
     const vy = pos.getY(i);
     const vz = pos.getZ(i);
-    const n1 = Math.sin(vx * 3.8 + seed) * Math.cos(vy * 4.2 + seed * 0.7) * Math.sin(vz * 3.6 - seed * 0.4);
-    const n2 = Math.cos(vx * 6.5 - vz * 5.4 + seed * 1.3) * 0.45;
-    const disp = 1.0 + (n1 + n2) * 0.14;
-    pos.setXYZ(i, vx * disp, vy * disp * 0.88, vz * disp);
+    const n1 = Math.sin(vx * 4.4 + seed) * Math.cos(vy * 5.0 + seed * 0.7) * Math.sin(vz * 4.2 - seed * 0.4);
+    const n2 = Math.cos(vx * 7.8 - vz * 6.4 + seed * 1.3) * 0.42;
+    const disp = 1.0 + (n1 + n2) * 0.18;
+    pos.setXYZ(i, vx * disp * 1.12, vy * disp * 0.74, vz * disp * 1.12);
   }
   geom.computeVertexNormals();
   return geom;
@@ -1569,52 +1569,66 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
   const foliageTex = createFoliageCanopyTexture(515);
   const foliageDarkMat = new THREE.MeshStandardMaterial({
     map: foliageTex,
-    color: 0x2f6848,
-    roughness: 0.94,
+    color: 0x357452,
+    emissive: new THREE.Color(0x102218),
+    emissiveIntensity: 0.22,
+    roughness: 0.92,
     metalness: 0.0
   });
   const foliageMidMat = new THREE.MeshStandardMaterial({
     map: foliageTex,
-    color: 0x468860,
-    roughness: 0.94,
+    color: 0x4e9668,
+    emissive: new THREE.Color(0x162d20),
+    emissiveIntensity: 0.24,
+    roughness: 0.92,
     metalness: 0.0
   });
   const foliageLightMat = new THREE.MeshStandardMaterial({
     map: foliageTex,
-    color: 0x64a878,
-    roughness: 0.94,
+    color: 0x6eb884,
+    emissive: new THREE.Color(0x1c3424),
+    emissiveIntensity: 0.22,
+    roughness: 0.92,
     metalness: 0.0
   });
 
   const bauhiniaShadowMatB = new THREE.MeshStandardMaterial({
     map: bauhiniaTex,
-    color: 0x9b5a84,
-    roughness: 0.96,
+    color: 0xa65e8c,
+    emissive: new THREE.Color(0x341624),
+    emissiveIntensity: 0.20,
+    roughness: 0.94,
     metalness: 0.0
   });
   const bauhiniaMidMat = new THREE.MeshStandardMaterial({
     map: bauhiniaTex,
-    color: 0xcc7ca4,
-    roughness: 0.96,
+    color: 0xd482ac,
+    emissive: new THREE.Color(0x3e1c2a),
+    emissiveIntensity: 0.22,
+    roughness: 0.94,
     metalness: 0.0
   });
   const bauhiniaLightMatA = new THREE.MeshStandardMaterial({
     map: bauhiniaTex,
-    color: 0xe69ec0,
-    roughness: 0.96,
+    color: 0xeca4c8,
+    emissive: new THREE.Color(0x462230),
+    emissiveIntensity: 0.22,
+    roughness: 0.94,
     metalness: 0.0
   });
   const bauhiniaLightMatB = new THREE.MeshStandardMaterial({
     map: bauhiniaTex,
-    color: 0xf4c4da,
-    roughness: 0.96,
+    color: 0xf7cae0,
+    emissive: new THREE.Color(0x42222c),
+    emissiveIntensity: 0.18,
+    roughness: 0.94,
     metalness: 0.0
   });
 
   const graniteCurbMat = new THREE.MeshStandardMaterial({ color: 0x768490, roughness: 0.84 });
   const soilMat = new THREE.MeshStandardMaterial({ color: 0x2c2622, roughness: 0.96 });
   const trunkMat = new THREE.MeshStandardMaterial({
-    color: 0x3e302c,
+    color: 0x453530,
     roughness: 0.94,
     metalness: 0.0
   });
@@ -1653,8 +1667,8 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     const tree = new THREE.Group();
     tree.position.set(x, Y0, z);
 
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.10 * scale, 0.18 * scale, 1.92 * scale, 8), trunkMat);
-    trunk.position.y = 0.96 * scale;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.095 * scale, 0.175 * scale, 1.94 * scale, 8), trunkMat);
+    trunk.position.y = 0.97 * scale;
     trunk.rotation.z = 0.06;
     trunk.castShadow = true;
     tree.add(trunk);
@@ -1666,52 +1680,61 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
       [-0.22, 1.98, -0.32, 0.35, -0.42]
     ];
     for (const [bx, by, bz, rz, rx] of branchSpecs) {
-      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.044 * scale, 0.082 * scale, 1.16 * scale, 7), trunkMat);
+      const br = markSkipPrintEdges(
+        new THREE.Mesh(new THREE.CylinderGeometry(0.042 * scale, 0.078 * scale, 1.18 * scale, 7), trunkMat)
+      );
       br.position.set(bx * scale, by * scale, bz * scale);
       br.rotation.set(rx, 0, rz);
       br.castShadow = true;
       tree.add(br);
     }
 
-    // Authentic Hong Kong Bauhinia: lush deep emerald foliage mixed with layered magenta/blush blossom puffs!
+    // Authentic Hong Kong Bauhinia: airy tiered emerald leaves & cascading magenta-blush blossom fronds!
     const clusterSpecs: Array<[number, number, number, number, THREE.MeshStandardMaterial]> = [
-      [-0.70, 2.12, 0.26, 0.52, foliageDarkMat],
-      [0.64, 2.16, -0.24, 0.54, foliageDarkMat],
-      [0.14, 2.14, 0.58, 0.50, foliageMidMat],
-      [-0.34, 2.20, -0.54, 0.52, foliageDarkMat],
-      [0.0, 2.30, 0.0, 0.60, foliageMidMat],
-      [-0.90, 2.52, -0.06, 0.50, bauhiniaMidMat],
-      [0.86, 2.54, 0.16, 0.52, bauhiniaShadowMatB],
-      [-0.18, 2.58, 0.80, 0.46, bauhiniaLightMatA],
-      [0.36, 2.58, -0.72, 0.48, foliageMidMat],
-      [-0.48, 2.68, 0.44, 0.54, bauhiniaLightMatA],
-      [0.44, 2.86, 0.38, 0.50, bauhiniaMidMat],
-      [-0.46, 2.92, -0.24, 0.52, foliageLightMat],
-      [0.12, 3.08, -0.32, 0.46, bauhiniaLightMatB],
-      [-0.12, 3.16, 0.18, 0.48, bauhiniaLightMatB],
-      [0.62, 2.84, -0.22, 0.42, bauhiniaLightMatA]
+      [-0.78, 2.06, 0.30, 0.46, foliageDarkMat],
+      [0.72, 2.10, -0.28, 0.48, foliageDarkMat],
+      [0.16, 2.08, 0.68, 0.44, foliageMidMat],
+      [-0.38, 2.14, -0.62, 0.46, foliageDarkMat],
+      [0.0, 2.26, 0.0, 0.54, foliageMidMat],
+      [-1.02, 2.40, -0.04, 0.44, bauhiniaMidMat],
+      [0.98, 2.42, 0.18, 0.46, bauhiniaShadowMatB],
+      [-0.20, 2.46, 0.90, 0.42, bauhiniaLightMatA],
+      [0.42, 2.48, -0.80, 0.42, foliageMidMat],
+      [-0.56, 2.60, 0.52, 0.48, bauhiniaLightMatA],
+      [0.52, 2.74, 0.44, 0.44, bauhiniaMidMat],
+      [-0.52, 2.82, -0.28, 0.46, foliageLightMat],
+      [0.74, 2.72, -0.26, 0.40, bauhiniaLightMatA],
+      [-0.84, 2.68, -0.44, 0.38, bauhiniaShadowMatB],
+      [0.24, 2.94, 0.64, 0.38, bauhiniaLightMatB],
+      [-0.22, 3.00, -0.58, 0.38, bauhiniaMidMat],
+      [0.14, 3.04, -0.24, 0.42, bauhiniaLightMatB],
+      [-0.14, 3.12, 0.18, 0.44, bauhiniaLightMatB],
+      [0.48, 2.98, -0.04, 0.36, bauhiniaLightMatA],
+      [-0.48, 2.96, 0.26, 0.36, bauhiniaLightMatB]
     ];
 
     clusterSpecs.forEach(([px, py, pz, r, mat], idx) => {
       const geom = createOrganicFoliageGeometry(r * scale, seedBase + idx * 1.9);
       const puff = markSkipPrintEdges(new THREE.Mesh(geom, mat));
+      puff.userData.printBotanical = 'bauhinia';
       puff.position.set(px * scale, py * scale, pz * scale);
-      puff.rotation.set(idx * 0.4, idx * 0.9, idx * 0.3);
+      puff.rotation.set(idx * 0.35, idx * 0.85, idx * 0.25);
       puff.castShadow = true;
       puff.receiveShadow = true;
       tree.add(puff);
     });
 
+    // Delicate fallen wet pink Bauhinia petals clinging to damp granite flagstones
     const petalMat = new THREE.MeshBasicMaterial({
-      color: 0xe6a0be,
+      color: 0xeea8c8,
       transparent: true,
-      opacity: 0.72,
+      opacity: 0.78,
       depthWrite: false
     });
-    for (let i = 0; i < 14; i++) {
-      const ang = (i / 14) * Math.PI * 2 + scale;
-      const dist = (0.58 + (i % 4) * 0.36) * scale;
-      const p = new THREE.Mesh(new THREE.CircleGeometry(0.058, 6), petalMat);
+    for (let i = 0; i < 22; i++) {
+      const ang = (i / 22) * Math.PI * 2 + scale * 1.3;
+      const dist = (0.52 + (i % 5) * 0.34) * scale;
+      const p = new THREE.Mesh(new THREE.CircleGeometry(0.056, 6), petalMat);
       p.rotation.x = -Math.PI / 2;
       p.position.set(Math.cos(ang) * dist, 0.018, Math.sin(ang) * dist);
       tree.add(p);
@@ -1749,64 +1772,74 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
 
     // Gnarled multi-stem Hong Kong Banyan trunk & wide spreading boughs
     const mainTrunk = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.14 * scale, 0.24 * scale, 1.85 * scale, 9),
+      new THREE.CylinderGeometry(0.135 * scale, 0.24 * scale, 1.86 * scale, 9),
       trunkMat
     );
-    mainTrunk.position.y = 0.38 + 0.92 * scale;
+    mainTrunk.position.y = 0.38 + 0.93 * scale;
     mainTrunk.rotation.z = -0.05;
     mainTrunk.castShadow = true;
     tree.add(mainTrunk);
 
     const boughs: Array<[number, number, number, number, number]> = [
-      [-0.44, 2.22, 0.24, 0.62, -0.35],
-      [0.48, 2.26, -0.22, -0.58, 0.40],
-      [0.14, 2.34, 0.44, -0.20, 0.58],
-      [-0.24, 2.28, -0.40, 0.38, -0.50]
+      [-0.46, 2.22, 0.24, 0.64, -0.35],
+      [0.48, 2.26, -0.22, -0.60, 0.40],
+      [0.14, 2.34, 0.44, -0.22, 0.60],
+      [-0.24, 2.28, -0.40, 0.40, -0.52]
     ];
     for (const [bx, by, bz, rz, rx] of boughs) {
-      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.052 * scale, 0.095 * scale, 1.24 * scale, 7), trunkMat);
+      const br = markSkipPrintEdges(
+        new THREE.Mesh(new THREE.CylinderGeometry(0.050 * scale, 0.092 * scale, 1.28 * scale, 7), trunkMat)
+      );
       br.position.set(bx * scale, by * scale, bz * scale);
       br.rotation.set(rx, 0, rz);
       br.castShadow = true;
       tree.add(br);
     }
 
-    // Iconic slender hanging Banyan aerial root curtains (氣根)
+    // Iconic slender hanging Hong Kong Banyan aerial root curtains (氣根)
     for (const [ax, az, len] of [
-      [-0.58, 0.32, 1.35],
-      [0.52, -0.28, 1.22],
-      [0.22, 0.56, 1.15],
-      [-0.32, -0.48, 1.28],
-      [0.64, 0.22, 1.05]
+      [-0.64, 0.34, 1.48],
+      [-0.48, 0.48, 1.24],
+      [0.54, -0.28, 1.32],
+      [0.24, 0.62, 1.26],
+      [-0.34, -0.52, 1.38],
+      [0.68, 0.24, 1.18],
+      [-0.78, -0.14, 1.12],
+      [0.42, 0.46, 1.08]
     ]) {
       const root = markSkipPrintEdges(
         new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.008, len * scale, 5), trunkMat)
       );
-      root.position.set(ax * scale, (2.35 - len * 0.5) * scale, az * scale);
+      root.position.set(ax * scale, (2.36 - len * 0.5) * scale, az * scale);
       tree.add(root);
     }
 
-    // Rich layered rainforest-green Banyan dome crown
+    // Airy layered rainforest-green Hong Kong Banyan umbrella crown
     const banyanClusters: Array<[number, number, number, number, THREE.MeshStandardMaterial]> = [
-      [-0.82, 2.52, 0.28, 0.62, foliageDarkMat],
-      [0.78, 2.55, -0.26, 0.64, foliageDarkMat],
-      [0.18, 2.52, 0.72, 0.58, foliageDarkMat],
-      [-0.36, 2.58, -0.68, 0.60, foliageDarkMat],
-      [0.0, 2.74, 0.0, 0.72, foliageMidMat],
-      [-0.98, 2.88, -0.14, 0.56, foliageMidMat],
-      [0.94, 2.90, 0.22, 0.58, foliageMidMat],
-      [-0.22, 2.96, 0.86, 0.52, foliageMidMat],
-      [0.44, 2.96, -0.76, 0.54, foliageMidMat],
-      [-0.46, 3.16, 0.42, 0.58, foliageLightMat],
-      [0.48, 3.22, 0.30, 0.56, foliageLightMat],
-      [-0.38, 3.28, -0.32, 0.54, foliageLightMat],
-      [0.06, 3.46, 0.04, 0.56, foliageLightMat]
+      [-0.92, 2.46, 0.32, 0.54, foliageDarkMat],
+      [0.86, 2.48, -0.30, 0.56, foliageDarkMat],
+      [0.20, 2.46, 0.80, 0.50, foliageDarkMat],
+      [-0.40, 2.52, -0.76, 0.52, foliageDarkMat],
+      [0.0, 2.68, 0.0, 0.64, foliageMidMat],
+      [-1.12, 2.78, -0.16, 0.48, foliageMidMat],
+      [1.06, 2.80, 0.24, 0.50, foliageMidMat],
+      [-0.26, 2.86, 0.96, 0.46, foliageMidMat],
+      [0.48, 2.88, -0.84, 0.48, foliageMidMat],
+      [-0.72, 2.94, 0.62, 0.44, foliageMidMat],
+      [0.72, 2.98, -0.52, 0.44, foliageMidMat],
+      [-0.50, 3.08, 0.42, 0.50, foliageLightMat],
+      [0.52, 3.12, 0.32, 0.48, foliageLightMat],
+      [-0.42, 3.18, -0.34, 0.46, foliageLightMat],
+      [0.36, 3.22, -0.44, 0.42, foliageLightMat],
+      [-0.64, 3.06, -0.18, 0.42, foliageLightMat],
+      [0.06, 3.34, 0.04, 0.50, foliageLightMat]
     ];
     banyanClusters.forEach(([px, py, pz, r, mat], idx) => {
       const geom = createOrganicFoliageGeometry(r * scale, 211 + idx * 2.3);
       const puff = markSkipPrintEdges(new THREE.Mesh(geom, mat));
+      puff.userData.printBotanical = 'banyan';
       puff.position.set(px * scale, py * scale, pz * scale);
-      puff.rotation.set(idx * 0.5, idx * 0.8, idx * 0.2);
+      puff.rotation.set(idx * 0.45, idx * 0.8, idx * 0.2);
       puff.castShadow = true;
       puff.receiveShadow = true;
       tree.add(puff);
@@ -1820,7 +1853,8 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
       [0.58, -0.52]
     ]) {
       const fern = markSkipPrintEdges(new THREE.Mesh(new THREE.DodecahedronGeometry(0.24, 0), foliageMidMat));
-      fern.scale.set(1.15, 0.75, 1.15);
+      fern.userData.printBotanical = 'banyan';
+      fern.scale.set(1.15, 0.72, 1.15);
       fern.position.set(fx, 0.52, fz);
       tree.add(fern);
     }
