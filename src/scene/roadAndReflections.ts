@@ -83,6 +83,21 @@ function createWetSidewalkRoughnessTexture(): THREE.CanvasTexture {
     ctx.stroke();
   }
 
+  // Organic rain-wet glossy sheen pockets (lower roughness ~0.30-0.42) so sidewalk lamps catch real highlights
+  for (let i = 0; i < 6; i++) {
+    const px = 48 + rand() * (S - 96);
+    const py = 48 + rand() * (S - 96);
+    const rx = 44 + rand() * 58;
+    const g = ctx.createRadialGradient(px, py, 4, px, py, rx);
+    g.addColorStop(0, 'rgba(92, 92, 92, 0.58)');
+    g.addColorStop(0.55, 'rgba(128, 128, 128, 0.28)');
+    g.addColorStop(1, 'rgba(180, 180, 180, 0.0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(px, py, rx, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.NoColorSpace;
   tex.wrapS = THREE.RepeatWrapping;
@@ -132,8 +147,8 @@ function createDoubleYellowPaintTexture(): THREE.CanvasTexture {
 
 /**
  * Orthographic-compatible planar wet-road reflector.
- * Uses 512x512 HalfFloat RT without MSAA (5-tap wet-asphalt blur already antialiases smoothly)
- * and zero per-frame object allocations inside onBeforeRender.
+ * Uses 768x768 HalfFloat RT without MSAA (9-tap anisotropic wet-asphalt blur + procedural
+ * GLSL raindrop ripple normal perturbation) and zero per-frame object allocations.
  */
 class PlanarWetReflector extends THREE.Mesh {
   private renderTarget: THREE.WebGLRenderTarget;
@@ -149,7 +164,7 @@ class PlanarWetReflector extends THREE.Mesh {
     hiddenDuringReflection: THREE.Object3D[]
   ) {
     const geom = new THREE.PlaneGeometry(width, height);
-    const renderTarget = new THREE.WebGLRenderTarget(512, 512, {
+    const renderTarget = new THREE.WebGLRenderTarget(768, 768, {
       type: THREE.HalfFloatType,
       samples: 0,
       minFilter: THREE.LinearFilter,
@@ -163,8 +178,8 @@ class PlanarWetReflector extends THREE.Mesh {
       uniforms: {
         tDiffuse: { value: renderTarget.texture },
         textureMatrix: { value: textureMatrix },
-        uTint: { value: new THREE.Color(0x8ea4ba) },
-        uBoost: { value: 1.22 },
+        uTint: { value: new THREE.Color(0x9cb2c8) },
+        uBoost: { value: 1.32 },
         uTime: { value: 0 },
         uMistColor: mistUniforms.uMistColor,
         uMistCenter: mistUniforms.uMistCenter,
@@ -192,18 +207,52 @@ class PlanarWetReflector extends THREE.Mesh {
         varying vec4 vReflectUv;
         varying vec3 vWorldPos;
 
+        vec2 hash22(vec2 p) {
+          vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+          p3 += dot(p3, p3.yzx + 33.33);
+          return fract((p3.xx + p3.yz) * p3.zy);
+        }
+
+        // Expanding concentric raindrop impact wave normal perturbation (zero-clip 2x2 nearest-cell stencil)
+        vec2 rainRippleOffset(vec2 p, float t) {
+          vec2 cell = floor(p);
+          vec2 local = fract(p);
+          vec2 stepDir = step(vec2(0.5), local) * 2.0 - 1.0;
+          vec2 acc = vec2(0.0);
+          for (int dy = 0; dy <= 1; dy++) {
+            for (int dx = 0; dx <= 1; dx++) {
+              vec2 nb = vec2(float(dx) * stepDir.x, float(dy) * stepDir.y);
+              vec2 h = hash22(cell + nb);
+              float age = fract(t * (0.44 + h.x * 0.28) + h.y);
+              vec2 center = nb + 0.22 + h * 0.56;
+              vec2 d = local - center;
+              float dist = length(d) + 0.0001;
+              float ringR = age * 0.56;
+              float dr = (dist - ringR) * 16.0;
+              float band = exp(-(dr * dr));
+              float wave = sin((dist - ringR) * 38.0) * band * (1.0 - age) * smoothstep(0.0, 0.12, age);
+              acc += (d / dist) * wave;
+            }
+          }
+          return acc;
+        }
+
         void main() {
           vec2 uv = vReflectUv.xy / max(vReflectUv.w, 0.0001);
 
-          // Organic wet-tarmac micro-grain + delicate animated rain-ripple surface shimmer
+          // Organic wet-tarmac micro-grain + physical expanding raindrop ripple refraction
           float g1 = sin(vWorldPos.x * 13.7 + vWorldPos.z * 9.3) * cos(vWorldPos.x * 8.1 - vWorldPos.z * 11.4);
-          float w1 = sin(vWorldPos.x * 5.2 + vWorldPos.z * 3.8 + uTime * 2.4);
-          float w2 = cos(vWorldPos.x * 7.6 - vWorldPos.z * 6.1 - uTime * 1.9);
-          vec2 jitter = vec2((w1 + w2 * 0.6) * 0.0011 + g1 * 0.0009, (w2 - w1 * 0.5) * 0.0014);
+          vec2 ripA = rainRippleOffset(vWorldPos.xz * 0.68, uTime);
+          vec2 ripB = rainRippleOffset(vWorldPos.xz * 1.12 + vec2(17.3, 9.1), uTime * 1.18 + 3.7);
+          vec2 ripples = ripA * 0.65 + ripB * 0.35;
+          float w1 = sin(vWorldPos.x * 5.2 + vWorldPos.z * 3.8 + uTime * 2.2);
+          float w2 = cos(vWorldPos.x * 7.6 - vWorldPos.z * 6.1 - uTime * 1.8);
+          vec2 jitter = vec2((w1 + w2 * 0.5) * 0.0008 + g1 * 0.0008, (w2 - w1 * 0.4) * 0.0010)
+                      + ripples * vec2(0.0036, 0.0046);
 
           // 9-tap anisotropic wet-asphalt vertical streak filter (silky rain-slicked neon ribbons!)
-          vec2 stepY = vec2(0.0, 0.0046);
-          vec2 stepX = vec2(0.0020, 0.0);
+          vec2 stepY = vec2(0.0, 0.0044);
+          vec2 stepX = vec2(0.0018, 0.0);
           vec3 col = texture2D(tDiffuse, clamp(uv + jitter, 0.002, 0.998)).rgb * 0.24;
           col += texture2D(tDiffuse, clamp(uv + jitter + stepY, 0.002, 0.998)).rgb * 0.14;
           col += texture2D(tDiffuse, clamp(uv + jitter - stepY, 0.002, 0.998)).rgb * 0.14;
@@ -216,12 +265,17 @@ class PlanarWetReflector extends THREE.Mesh {
 
           // Soft-knee HDR shoulder compression prevents boxy bright bulb firefly squares
           col = max(col, vec3(0.0));
-          col = col / (vec3(1.0) + col * 0.42);
+          col = col / (vec3(1.0) + col * 0.40);
 
-          // Wet dark-tar Fresnel grading: keeps dark asphalt moody while warm shops & neon gleam richly
-          vec3 graded = pow(col, vec3(1.16));
-          float grainMod = 0.94 + 0.06 * g1;
-          vec3 reflected = graded * uTint * uBoost * 0.78 * grainMod;
+          // Preserve vibrant neon chromaticity (crimson, amber, emerald, cyan) across wet dark tar
+          float lum = dot(col, vec3(0.299, 0.587, 0.114));
+          vec3 saturated = mix(vec3(lum), col, 1.24);
+          vec3 graded = pow(max(saturated, vec3(0.0)), vec3(1.13));
+
+          // Delicate rain-ripple crest specular glint & micro-grain modulation
+          float rippleGlint = clamp(length(ripples) * 0.075, 0.0, 0.08);
+          float grainMod = 0.93 + 0.07 * g1 + rippleGlint;
+          vec3 reflected = graded * uTint * uBoost * 0.80 * grainMod;
 
           // Smooth radial mist dissolve matched cleanly with road/sidewalk fade
           float dist = length(vWorldPos.xz - uMistCenter);
@@ -575,7 +629,7 @@ export function createRoadAndReflections(
   // Warm tungsten spills on wet asphalt road outside 金鳳冰室 (B1) & 明記雲吞麵 (B2)
   addPuddleGlow(-3.3, 6.8, 6.4, 5.8, 0xff9b38, 0.24);
   addPuddleGlow(-3.2, 0.5, 6.8, 4.8, 0xff9634, 0.30);
-  addPuddleGlow(-3.6, 5.4, 3.8, 3.6, 0xff5448, 0.13);
+  addPuddleGlow(-3.6, 5.4, 3.8, 3.6, 0xff5448, 0.14);
   // Subtle icy-cyan & warm-white reflection spill outside East Plaza vending machines & MTR Exit A3
   addPuddleGlow(3.3, 3.5, 5.2, 4.6, 0x5cd8f6, 0.18);
   addPuddleGlow(7.65, 3.65, 4.0, 3.2, 0x6ce2fa, 0.16, 0.175);
@@ -584,6 +638,32 @@ export function createRoadAndReflections(
   addPuddleGlow(8.7, 8.2, 4.4, 3.8, 0xffb250, 0.19, 0.175);
   // Crisp cyan wet sheen outside far-right B4 24H convenience store (15.4, -9.6)
   addPuddleGlow(14.6, -5.6, 5.6, 3.8, 0x72e6ff, 0.20, 0.175);
+  // Soft under-viaduct soffit fluorescent wash onto wet road & east Route 101 bus shelter pavement
+  addPuddleGlow(0.0, -3.8, 7.2, 3.6, 0xffe2b4, 0.13);
+  addPuddleGlow(8.4, -5.4, 4.4, 3.8, 0xffe0ac, 0.16, 0.175);
+
+  // Live 14-second HK traffic signal wet-asphalt reflection pools flanking the zebra crossing (z = 2.45)
+  const signalPuddleMats: THREE.MeshBasicMaterial[] = [];
+  for (const sx of [-4.05, 4.05]) {
+    const sMat = new THREE.MeshBasicMaterial({
+      map: glowTex,
+      color: 0xff3b36,
+      transparent: true,
+      opacity: 0.20,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const sm = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.4), sMat);
+    sm.rotation.x = -Math.PI / 2;
+    sm.position.set(sx, 0.037, 2.55);
+    sm.renderOrder = 4;
+    glowGroup.add(sm);
+    signalPuddleMats.push(sMat);
+  }
+  const sigColRed = new THREE.Color(0xff3834);
+  const sigColRedAmber = new THREE.Color(0xff7c2e);
+  const sigColGreen = new THREE.Color(0x2ef090);
+  const sigColAmber = new THREE.Color(0xffaa2c);
 
   group.add(glowGroup);
   hiddenDuringReflection.push(glowGroup);
@@ -875,6 +955,22 @@ export function createRoadAndReflections(
     },
     update: (simTime) => {
       reflector.setTime(simTime);
+      const sigClock = simTime + 2.1;
+      const sigT = ((sigClock % 14.0) + 14.0) % 14.0;
+      const targetCol =
+        sigT < 6.0
+          ? sigColRed
+          : sigT < 8.5
+          ? sigColRedAmber
+          : sigT < 12.5
+          ? sigColGreen
+          : sigColAmber;
+      const pulse = 0.92 + 0.08 * Math.sin(simTime * 3.4);
+      const baseOp = sigT < 6.0 ? 0.21 : sigT < 8.5 ? 0.24 : sigT < 12.5 ? 0.19 : 0.21;
+      for (const sm of signalPuddleMats) {
+        sm.color.copy(targetCol);
+        sm.opacity = baseOp * currentGlowScale * pulse;
+      }
     },
     dispose: () => {
       reflector.dispose();

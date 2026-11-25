@@ -179,7 +179,7 @@ export const ATMOSPHERE_PRESETS: Record<PresetName, AtmospherePresetConfig> = {
     name: 'dusk',
     bgHex: 0x89a0b6,
     cssBg: '#89a0b6',
-    mistCloudHex: 0xb2c5d6,
+    mistCloudHex: 0x9cb2c6,
     towerTintHex: 0x62788f,
     keyColor: 0xd0e0f4,
     keyIntensity: 1.54,
@@ -189,14 +189,14 @@ export const ATMOSPHERE_PRESETS: Record<PresetName, AtmospherePresetConfig> = {
     hemiIntensity: 1.06,
     fillColor: 0x7a96b4,
     fillIntensity: 0.44,
-    emissiveScale: 1.06,
-    shopLightScale: 0.96,
-    bloomStrength: 0.28,
-    bloomRadius: 0.52,
-    bloomThreshold: 0.89,
-    reflectTint: 0x90a8c0,
-    reflectBoost: 1.24,
-    mistOpacity: 0.27,
+    emissiveScale: 1.08,
+    shopLightScale: 0.98,
+    bloomStrength: 0.30,
+    bloomRadius: 0.54,
+    bloomThreshold: 0.88,
+    reflectTint: 0x9cb2c8,
+    reflectBoost: 1.32,
+    mistOpacity: 0.23,
     rainOpacity: 0.16,
     rainAudioIntensity: 1.0
   },
@@ -204,7 +204,7 @@ export const ATMOSPHERE_PRESETS: Record<PresetName, AtmospherePresetConfig> = {
     name: 'midnight',
     bgHex: 0x162032,
     cssBg: '#162032',
-    mistCloudHex: 0x263750,
+    mistCloudHex: 0x1d2b40,
     towerTintHex: 0x0d1524,
     keyColor: 0x6c8cc2,
     keyIntensity: 0.66,
@@ -214,14 +214,14 @@ export const ATMOSPHERE_PRESETS: Record<PresetName, AtmospherePresetConfig> = {
     hemiIntensity: 0.58,
     fillColor: 0x3e5884,
     fillIntensity: 0.34,
-    emissiveScale: 1.42,
-    shopLightScale: 1.38,
-    bloomStrength: 0.42,
-    bloomRadius: 0.60,
-    bloomThreshold: 0.78,
-    reflectTint: 0x9ab4d2,
-    reflectBoost: 1.48,
-    mistOpacity: 0.21,
+    emissiveScale: 1.45,
+    shopLightScale: 1.40,
+    bloomStrength: 0.44,
+    bloomRadius: 0.62,
+    bloomThreshold: 0.76,
+    reflectTint: 0xa8c0dc,
+    reflectBoost: 1.56,
+    mistOpacity: 0.18,
     rainOpacity: 0.17,
     rainAudioIntensity: 1.25
   },
@@ -229,7 +229,7 @@ export const ATMOSPHERE_PRESETS: Record<PresetName, AtmospherePresetConfig> = {
     name: 'dawn',
     bgHex: 0xb6c7d6,
     cssBg: '#b6c7d6',
-    mistCloudHex: 0xd6e2ec,
+    mistCloudHex: 0xc5d4e2,
     towerTintHex: 0x8ea4b8,
     keyColor: 0xffe4c6,
     keyIntensity: 1.82,
@@ -239,14 +239,14 @@ export const ATMOSPHERE_PRESETS: Record<PresetName, AtmospherePresetConfig> = {
     hemiIntensity: 1.18,
     fillColor: 0x90a8c2,
     fillIntensity: 0.46,
-    emissiveScale: 0.62,
-    shopLightScale: 0.60,
-    bloomStrength: 0.20,
-    bloomRadius: 0.44,
-    bloomThreshold: 0.94,
-    reflectTint: 0x7e92a4,
-    reflectBoost: 0.88,
-    mistOpacity: 0.29,
+    emissiveScale: 0.64,
+    shopLightScale: 0.62,
+    bloomStrength: 0.21,
+    bloomRadius: 0.45,
+    bloomThreshold: 0.93,
+    reflectTint: 0x8ea2b4,
+    reflectBoost: 0.94,
+    mistOpacity: 0.24,
     rainOpacity: 0.12,
     rainAudioIntensity: 0.68
   }
@@ -340,7 +340,9 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
     // B1 大押 crimson neon warm splash
     { pos: [-6.6, 5.8, 5.4], color: 0xff6258, intensity: 5.6, distance: 8.5, decay: 1.78 },
     // B3 / B6 back-left alley warm stairwell bounce under viaduct
-    { pos: [-10.8, 2.4, -7.2], color: 0xffaa4c, intensity: 6.8, distance: 9.5, decay: 1.68 }
+    { pos: [-10.8, 2.4, -7.2], color: 0xffaa4c, intensity: 6.8, distance: 9.5, decay: 1.68 },
+    // East under-viaduct soffit fluorescent wash over Route 101 bus shelter & pier
+    { pos: [9.2, 4.9, -5.0], color: 0xffe4b8, intensity: 7.4, distance: 10.5, decay: 1.66 }
   ];
 
   const localLights: Array<{ light: THREE.PointLight; baseIntensity: number }> = [];
@@ -408,29 +410,32 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
     addCloud(cx, cy, cz, sx, sy, op, 0.14 + (i % 5) * 0.03, 1.3 + (i % 3) * 0.5, i * 0.9, i % 2 === 1);
   }
 
-  // 8 dedicated portal mist billows enveloping the viaduct (z=-3.8) & road exits cleanly
+  // 8 dedicated portal mist billows gently enveloping the viaduct (z=-3.8) & road exits without hard contrast cutouts
   const portalSpecs: Array<[number, number, number, number, number, number]> = [
-    [-25.5, 6.8, -3.8, 17.0, 9.0, 0.36],
-    [-29.5, 7.6, -4.0, 20.0, 10.0, 0.44],
-    [25.5, 6.6, -3.8, 17.0, 9.0, 0.36],
-    [29.5, 7.4, -3.4, 20.0, 10.0, 0.44],
-    [-1.0, 2.0, 23.0, 18.0, 7.8, 0.28],
-    [1.6, 1.8, 26.8, 21.0, 9.0, 0.38],
-    [0.4, 3.0, -22.5, 18.0, 8.4, 0.34],
-    [-2.5, 4.4, -26.5, 21.0, 10.0, 0.44]
+    [-24.5, 6.8, -2.6, 17.5, 9.2, 0.28],
+    [-29.5, 7.6, -2.8, 21.0, 10.4, 0.34],
+    [24.5, 6.6, -2.4, 17.5, 9.2, 0.28],
+    [29.5, 7.4, -2.2, 21.0, 10.4, 0.34],
+    [-1.0, 2.0, 23.0, 18.0, 7.8, 0.24],
+    [1.6, 1.8, 26.8, 21.0, 9.0, 0.30],
+    [0.4, 3.0, -22.5, 18.0, 8.4, 0.26],
+    [-2.5, 4.4, -26.5, 21.0, 10.0, 0.34]
   ];
   portalSpecs.forEach(([x, y, z, sx, sy, op], idx) => {
     addCloud(x, y, z, sx, sy, op, 0.16 + idx * 0.02, 1.2, idx * 1.3, idx % 2 === 0);
   });
 
-  // 6 soft background atmospheric wisps curling behind B3, B6, B5, B4 & outer alleys
+  // 8 soft background & low street-canyon atmospheric wisps curling behind tenements and beneath the viaduct
   const lowMistSpecs: Array<[number, number, number, number, number, number]> = [
-    [-19.5, 4.8, -16.8, 16.0, 8.0, 0.24],
-    [17.5, 4.8, -18.5, 16.5, 8.2, 0.24],
-    [-21.2, 2.8, 6.0, 15.0, 6.8, 0.22],
-    [21.5, 2.8, 5.2, 15.0, 6.8, 0.20],
-    [-2.8, 12.2, -23.0, 20.5, 9.2, 0.25],
-    [23.5, 7.8, -13.5, 16.5, 8.0, 0.23]
+    [-19.5, 4.8, -16.8, 16.0, 8.0, 0.20],
+    [17.5, 4.8, -18.5, 16.5, 8.2, 0.20],
+    [-21.2, 2.8, 6.0, 15.0, 6.8, 0.18],
+    [21.5, 2.8, 5.2, 15.0, 6.8, 0.16],
+    [-2.8, 12.2, -23.0, 20.5, 9.2, 0.20],
+    [23.5, 7.8, -13.5, 16.5, 8.0, 0.19],
+    // Delicate monsoon street-canyon wisps drifting behind the viaduct piers (depth separation!)
+    [0.4, 3.1, -6.2, 11.5, 4.4, 0.11],
+    [-8.6, 3.6, -5.8, 9.8, 4.0, 0.10]
   ];
   lowMistSpecs.forEach(([x, y, z, sx, sy, op], idx) => {
     addCloud(x, y, z, sx, sy, op, 0.12 + idx * 0.025, 1.5, idx * 1.7 + 0.5, idx % 2 === 1);
@@ -481,11 +486,13 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
 
       void main() {
         float baseFade = smoothstep(0.08, 0.44, vUv.y);
-        float topFade = 1.0 - smoothstep(0.76, 1.0, vUv.y) * 0.72;
-        float horizFade = 1.0 - smoothstep(12.0, 24.0, abs(vWorldPos.x));
+        float topFade = 1.0 - smoothstep(0.74, 1.0, vUv.y) * 0.88;
+        // Fade smoothly along the isometric camera's horizontal screen axis ((x - z) * 0.707)
+        float screenX = (vWorldPos.x - vWorldPos.z) * 0.7071;
+        float horizFade = 1.0 - smoothstep(7.0, 19.0, abs(screenX - 1.5));
         // Subtle directional side-plane differentiation so horizon towers have gentle 3D volume
         float sideShade = mix(0.86, 1.06, clamp(dot(vNormalW, normalize(vec3(0.7, 0.4, 0.5))) * 0.5 + 0.5, 0.0, 1.0));
-        vec3 baseCol = mix(uMistColor, uTowerColor * sideShade, uStrength * baseFade * topFade * mix(0.35, 1.0, horizFade));
+        vec3 baseCol = mix(uMistColor, uTowerColor * sideShade, uStrength * baseFade * topFade * horizFade);
 
         // Whisper-faint distant high-rise window pinpoints muted near screen edges
         float isWall = 1.0 - abs(vNormalW.y);
@@ -497,14 +504,14 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
         vec3 winColor = mix(vec3(0.96, 0.78, 0.50), vec3(0.64, 0.86, 0.98), step(0.95, winRand));
         vec3 finalCol = baseCol + winColor * lit * uWindowGlow * 0.15;
 
-        float alpha = clamp(baseFade * topFade * 0.92, 0.0, 1.0);
+        float alpha = clamp(baseFade * topFade * horizFade * 0.90, 0.0, 1.0);
         if (alpha < 0.01) discard;
         gl_FragColor = vec4(finalCol, alpha);
       }
     `
   });
 
-  // Tightly composed Hong Kong background horizon cluster strictly behind the north-west / north backdrop
+  // Tightly composed Hong Kong background horizon cluster strictly behind the north-west B3/B6 skyline
   const towerSpecs: Array<{
     x: number;
     z: number;
@@ -514,11 +521,11 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
     stepped?: boolean;
     spire?: boolean;
   }> = [
-    { x: -24, z: -34, w: 5.4, d: 4.8, h: 25, stepped: true },
-    { x: -13, z: -38, w: 5.8, d: 5.0, h: 31, spire: true },
-    { x: 0, z: -40, w: 6.2, d: 4.8, h: 27 },
-    { x: 13, z: -38, w: 5.4, d: 5.0, h: 29, stepped: true },
-    { x: 25, z: -33, w: 5.6, d: 5.0, h: 24 }
+    { x: -34, z: -26, w: 5.0, d: 4.6, h: 24, stepped: true },
+    { x: -26, z: -32, w: 5.4, d: 4.8, h: 30, spire: true },
+    { x: -16, z: -35, w: 5.8, d: 4.8, h: 27 },
+    { x: -6, z: -36, w: 5.2, d: 4.8, h: 29, stepped: true },
+    { x: 2, z: -35, w: 5.0, d: 4.6, h: 23 }
   ];
 
   for (const t of towerSpecs) {
