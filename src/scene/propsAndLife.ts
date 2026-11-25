@@ -78,9 +78,14 @@ function fitFontSize(
 
 /**
  * Hong Kong pedestrian crossing signal face (過路公仔燈):
- * dimmed upper red standing figure + luminous lower emerald-green walking man (綠公仔).
+ * switches cleanly between bright emerald-green walking man (綠公仔)
+ * and bright crimson standing man (紅公仔).
  */
-function createPedSignalTexture(): { map: THREE.CanvasTexture; emissiveMap: THREE.CanvasTexture } {
+function createPedSignalTexture(
+  active: 'green' | 'red'
+): { map: THREE.CanvasTexture; emissiveMap: THREE.CanvasTexture } {
+  const redLit = active === 'red';
+  const greenLit = active === 'green';
   const drawSignal = (emissiveOnly: boolean) =>
     makeLocalTexture(128, 256, (ctx, W, H) => {
       ctx.fillStyle = emissiveOnly ? '#000000' : '#161b20';
@@ -92,13 +97,26 @@ function createPedSignalTexture(): { map: THREE.CanvasTexture; emissiveMap: THRE
         ctx.strokeRect(3, 3, W - 6, H - 6);
       }
 
-      // Upper lens circle (dimmed red standing man)
-      ctx.fillStyle = emissiveOnly ? '#140404' : '#111418';
+      // Upper lens circle (red standing man — 紅公仔)
+      ctx.fillStyle = redLit
+        ? (emissiveOnly ? '#1c0506' : '#1b1112')
+        : (emissiveOnly ? '#080202' : '#111418');
       ctx.beginPath();
       ctx.arc(W * 0.5, 68, 44, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = emissiveOnly ? '#420c0e' : '#5e1a1e';
+      if (redLit) {
+        const redHalo = ctx.createRadialGradient(W * 0.5, 68, 6, W * 0.5, 68, 44);
+        redHalo.addColorStop(0, 'rgba(255, 86, 72, 0.58)');
+        redHalo.addColorStop(0.6, 'rgba(230, 48, 40, 0.20)');
+        redHalo.addColorStop(1, 'rgba(180, 28, 24, 0)');
+        ctx.fillStyle = redHalo;
+        ctx.beginPath();
+        ctx.arc(W * 0.5, 68, 44, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = redLit ? '#ff6258' : (emissiveOnly ? '#180506' : '#3d1517');
       // Standing red man silhouette
       ctx.beginPath();
       ctx.arc(W * 0.5, 44, 8, 0, Math.PI * 2);
@@ -107,25 +125,29 @@ function createPedSignalTexture(): { map: THREE.CanvasTexture; emissiveMap: THRE
       ctx.fillRect(W * 0.5 - 8, 78, 6, 20);
       ctx.fillRect(W * 0.5 + 2, 78, 6, 20);
 
-      // Lower lens circle (bright emerald-green walking man — 綠公仔!)
-      ctx.fillStyle = emissiveOnly ? '#061a10' : '#0f1816';
+      // Lower lens circle (emerald-green walking man — 綠公仔)
+      ctx.fillStyle = greenLit
+        ? (emissiveOnly ? '#061a10' : '#0f1816')
+        : (emissiveOnly ? '#020806' : '#111418');
       ctx.beginPath();
       ctx.arc(W * 0.5, 186, 46, 0, Math.PI * 2);
       ctx.fill();
 
-      // Subtle radiant emerald halo behind green walking man
-      const halo = ctx.createRadialGradient(W * 0.5, 186, 6, W * 0.5, 186, 44);
-      halo.addColorStop(0, 'rgba(56, 255, 152, 0.55)');
-      halo.addColorStop(0.6, 'rgba(28, 230, 124, 0.18)');
-      halo.addColorStop(1, 'rgba(20, 180, 96, 0)');
-      ctx.fillStyle = halo;
-      ctx.beginPath();
-      ctx.arc(W * 0.5, 186, 44, 0, Math.PI * 2);
-      ctx.fill();
+      if (greenLit) {
+        const halo = ctx.createRadialGradient(W * 0.5, 186, 6, W * 0.5, 186, 44);
+        halo.addColorStop(0, 'rgba(56, 255, 152, 0.55)');
+        halo.addColorStop(0.6, 'rgba(28, 230, 124, 0.18)');
+        halo.addColorStop(1, 'rgba(20, 180, 96, 0)');
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.arc(W * 0.5, 186, 44, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
-      // Crisp green walking figure silhouette
-      ctx.fillStyle = '#62ffb0';
-      ctx.strokeStyle = '#62ffb0';
+      // Walking figure silhouette
+      const walkColor = greenLit ? '#62ffb0' : (emissiveOnly ? '#081810' : '#163828');
+      ctx.fillStyle = walkColor;
+      ctx.strokeStyle = walkColor;
       ctx.lineCap = 'round';
       ctx.lineWidth = 7;
       // Head
@@ -799,11 +821,13 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
   // 3-aspect vehicle head with white backing border & visors, glowing green walking man
   // (綠公仔 -> 閃綠公仔 -> 紅公仔), and iconic yellow HK tactile pedestrian audio-button box!
   // =========================================================================
-  const pedSigTex = createPedSignalTexture();
+  const pedSigGreen = createPedSignalTexture('green');
+  const pedSigRed = createPedSignalTexture('red');
+  let pedSigPhase: 'green' | 'red' = 'green';
   const pedFaceMat = new THREE.MeshStandardMaterial({
-    map: pedSigTex.map,
+    map: pedSigGreen.map,
     emissive: new THREE.Color(0x52ffa8),
-    emissiveMap: pedSigTex.emissiveMap,
+    emissiveMap: pedSigGreen.emissiveMap,
     emissiveIntensity: 1.85,
     roughness: 0.25
   });
@@ -2558,11 +2582,14 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     },
     setPrintMode: (enabled) => {
       printModeActive = enabled;
+      const coneScale = Math.min(1.45, 0.4 + currentEmissiveScale * 0.6);
       for (const c of softCones) {
         c.mat.visible = !enabled;
+        c.mat.uniforms.uOpacity.value = enabled ? 0 : c.baseOpacity * coneScale;
       }
       for (const h of lampHaloMats) {
         h.mat.visible = !enabled;
+        h.mat.opacity = enabled ? 0 : h.baseOpacity * coneScale;
       }
     },
     update: (simTime) => {
@@ -2637,6 +2664,14 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
 
       // 5. Authentic 14-second Hong Kong Traffic Signal & Flashing Green Man Cycle!
       const sc = currentEmissiveScale;
+      const desiredPedPhase: 'green' | 'red' = sigT < 8.5 ? 'green' : 'red';
+      if (desiredPedPhase !== pedSigPhase) {
+        pedSigPhase = desiredPedPhase;
+        const tex = desiredPedPhase === 'green' ? pedSigGreen : pedSigRed;
+        pedFaceMat.map = tex.map;
+        pedFaceMat.emissiveMap = tex.emissiveMap;
+        pedFaceMat.needsUpdate = true;
+      }
       if (sigT < 6.0) {
         // Vehicle RED · Pedestrian STEADY GREEN MAN (hero pose at t = 0.25)
         vehRedLitMat.emissiveIntensity = 2.35 * sc;
@@ -2658,14 +2693,14 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
         vehAmberDimMat.emissiveIntensity = 0.14 * sc;
         vehGreenDimMat.emissiveIntensity = 2.35 * sc;
         pedFaceMat.emissive.copy(pedRedColor);
-        pedFaceMat.emissiveIntensity = 1.45 * sc;
+        pedFaceMat.emissiveIntensity = 1.65 * sc;
       } else {
         // Vehicle AMBER · Pedestrian RED MAN
         vehRedLitMat.emissiveIntensity = 0.14 * sc;
         vehAmberDimMat.emissiveIntensity = 2.25 * sc;
         vehGreenDimMat.emissiveIntensity = 0.12 * sc;
         pedFaceMat.emissive.copy(pedRedColor);
-        pedFaceMat.emissiveIntensity = 1.45 * sc;
+        pedFaceMat.emissiveIntensity = 1.65 * sc;
       }
     }
   };

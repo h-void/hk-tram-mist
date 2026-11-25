@@ -217,6 +217,7 @@ export class HKSoundscape {
    * (if audio context is running or after gesture unlock).
    */
   public ringTramBell(): void {
+    if (this.userExplicitlyMuted) return;
     if (!this.unlocked) {
       this.unlockAndStart(false);
     }
@@ -282,6 +283,7 @@ export class HKSoundscape {
    * triggered when clicking the green-roof minibus or parked red taxi.
    */
   public ringVehicleHorn(variant: 'minibus' | 'taxi' = 'taxi'): void {
+    if (this.userExplicitlyMuted) return;
     if (!this.unlocked) {
       this.unlockAndStart(false);
     }

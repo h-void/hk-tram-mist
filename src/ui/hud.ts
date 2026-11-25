@@ -28,6 +28,7 @@ const LABELS = {
     soundOn: '雨聲開',
     soundOff: '靜音',
     lang: 'EN',
+    github: 'GitHub 源碼 ↗︎',
     hint: '拖曳旋轉 · 滾輪縮放 · 點擊車輛鳴笛'
   },
   en: {
@@ -46,6 +47,7 @@ const LABELS = {
     soundOn: 'Sound',
     soundOff: 'Muted',
     lang: '繁中',
+    github: 'GitHub Source ↗︎',
     hint: 'Drag orbit · Scroll zoom · Click vehicles'
   }
 } as const;
@@ -55,6 +57,7 @@ export class DioramaHud {
   private titleMainEl!: HTMLDivElement;
   private titleSubEl!: HTMLDivElement;
   private hintEl!: HTMLDivElement;
+  private githubLabelEl!: HTMLSpanElement;
   private presetBtns = new Map<PresetName, HTMLButtonElement>();
   private cameraBtns = new Map<CameraView, HTMLButtonElement>();
   private acousticBtn!: HTMLButtonElement;
@@ -174,10 +177,26 @@ export class DioramaHud {
       actionGroup
     );
 
+    const topRight = document.createElement('div');
+    topRight.className = 'hud-topright';
+
     this.hintEl = document.createElement('div');
     this.hintEl.className = 'hud-hint';
 
-    this.root.append(title, dock, this.hintEl);
+    const githubLink = document.createElement('a');
+    githubLink.id = 'link-github-source';
+    githubLink.className = 'hud-source-link';
+    githubLink.href = 'https://github.com/h-void/hk-tram-mist';
+    githubLink.target = '_blank';
+    githubLink.rel = 'noopener noreferrer';
+    githubLink.innerHTML =
+      '<svg class="hud-github-mark" viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>';
+    this.githubLabelEl = document.createElement('span');
+    githubLink.appendChild(this.githubLabelEl);
+
+    topRight.append(this.hintEl, githubLink);
+
+    this.root.append(title, dock, topRight);
   }
 
   private makeBtn(shortcut: string, onClick: () => void): HTMLButtonElement {
@@ -201,8 +220,10 @@ export class DioramaHud {
 
   private setBtnLabel(btn: HTMLButtonElement, label: string): void {
     const shortcut = btn.dataset.shortcut ?? '';
+    const keyName = shortcut === '␣' ? 'Space' : shortcut;
+    btn.setAttribute('aria-label', keyName ? `${label} (${keyName})` : label);
     btn.innerHTML = shortcut
-      ? `<span class="hud-key">${shortcut}</span><span>${label}</span>`
+      ? `<span class="hud-key" aria-hidden="true">${shortcut}</span><span>${label}</span>`
       : `<span>${label}</span>`;
   }
 
@@ -212,6 +233,7 @@ export class DioramaHud {
     this.titleMainEl.innerHTML = `<span>${t.title}</span><span class="hud-title-seal">${t.seal}</span>`;
     this.titleSubEl.textContent = t.subtitle;
     this.hintEl.textContent = t.hint;
+    this.githubLabelEl.textContent = t.github;
 
     this.setBtnLabel(this.presetBtns.get('dusk')!, t.dusk);
     this.setBtnLabel(this.presetBtns.get('midnight')!, t.midnight);
@@ -230,15 +252,24 @@ export class DioramaHud {
 
   private syncState(): void {
     for (const [preset, btn] of this.presetBtns) {
-      btn.classList.toggle('active', preset === this.currentPreset);
+      const active = preset === this.currentPreset;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     }
     for (const [cam, btn] of this.cameraBtns) {
-      btn.classList.toggle('active', cam === this.currentCamera);
+      const active = cam === this.currentCamera;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     }
-    this.acousticBtn.classList.toggle('active-cyan', this.currentMode === 'acoustic');
-    this.printBtn.classList.toggle('active', this.currentMode === 'print');
+    const acousticActive = this.currentMode === 'acoustic';
+    const printActive = this.currentMode === 'print';
+    this.acousticBtn.classList.toggle('active-cyan', acousticActive);
+    this.acousticBtn.setAttribute('aria-pressed', acousticActive ? 'true' : 'false');
+    this.printBtn.classList.toggle('active', printActive);
+    this.printBtn.setAttribute('aria-pressed', printActive ? 'true' : 'false');
     this.soundBtn.classList.toggle('active-cyan', this.soundEnabled);
-    document.body.classList.toggle('mode-print', this.currentMode === 'print');
+    this.soundBtn.setAttribute('aria-pressed', this.soundEnabled ? 'true' : 'false');
+    document.body.classList.toggle('mode-print', printActive);
   }
 
   public setState(state: {
@@ -265,6 +296,8 @@ export class DioramaHud {
   private setupIdleFade(): void {
     const wake = () => this.bumpActivity();
     window.addEventListener('pointermove', wake, { passive: true });
+    window.addEventListener('pointerdown', wake, { passive: true });
+    window.addEventListener('touchstart', wake, { passive: true });
     window.addEventListener('keydown', wake, { passive: true });
     this.bumpActivity();
   }

@@ -605,7 +605,9 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
       towersGroup.visible = true;
       applyPreset(activePreset);
     }
-    document.body.style.background = enabled ? '#f4efe6' : cfg.cssBg;
+    const bg = enabled ? '#f4efe6' : cfg.cssBg;
+    document.documentElement.style.background = bg;
+    document.body.style.background = bg;
   };
 
   const update = (simTime: number) => {

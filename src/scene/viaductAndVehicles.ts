@@ -2484,8 +2484,16 @@ export function createViaductAndVehicles(
   pantoSparkLight.position.set(0.06, 5.22, -0.18);
   tramGroup.add(pantoSparkLight);
 
+  const isSolidVehicleMesh = (obj: THREE.Object3D): boolean => {
+    if (!(obj instanceof THREE.Mesh)) return false;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    return mats.every((m) => m && m.blending !== THREE.AdditiveBlending);
+  };
+
   tramGroup.traverse((obj) => {
-    obj.userData.isTram = true;
+    if (isSolidVehicleMesh(obj)) {
+      obj.userData.isTram = true;
+    }
   });
 
   tramGroup.position.set(-1.85, 0, 5.6);
@@ -3056,7 +3064,9 @@ export function createViaductAndVehicles(
   }
 
   taxiGroup.traverse((obj) => {
-    obj.userData.isTaxi = true;
+    if (isSolidVehicleMesh(obj)) {
+      obj.userData.isTaxi = true;
+    }
   });
   taxiGroup.position.set(7.5, 0.185, 11.6);
   taxiGroup.rotation.y = 0.0;
@@ -3358,7 +3368,9 @@ export function createViaductAndVehicles(
   }
 
   minibusGroup.traverse((obj) => {
-    obj.userData.isMinibus = true;
+    if (isSolidVehicleMesh(obj)) {
+      obj.userData.isMinibus = true;
+    }
   });
   minibusGroup.position.set(2.05, 0, 0.70);
   group.add(minibusGroup);
@@ -3455,14 +3467,18 @@ export function createViaductAndVehicles(
     },
     setPrintMode: (enabled) => {
       printModeActive = enabled;
+      const beamScale = Math.min(1.4, 0.45 + currentEmissiveScale * 0.55);
       for (const b of spillMaterials) {
         b.mat.visible = !enabled;
+        b.mat.opacity = enabled ? 0 : b.baseOpacity * beamScale;
       }
       for (const c of softCones) {
         c.mat.visible = !enabled;
+        c.mat.uniforms.uOpacity.value = enabled ? 0 : c.baseOpacity * beamScale;
       }
       for (const l of movingLights) {
         l.light.visible = !enabled;
+        l.light.intensity = enabled ? 0 : l.baseIntensity * Math.min(1.45, currentEmissiveScale);
       }
       pantoSparkSprite.visible = !enabled;
       pantoSparkLight.visible = !enabled;

@@ -250,6 +250,9 @@ function boot(): void {
       renderer.toneMappingExposure = 1.0;
     } else {
       const cfg = ATMOSPHERE_PRESETS[currentPreset];
+      buildings.setEmissiveScale(cfg.emissiveScale);
+      viaductAndVehicles.setEmissiveScale(cfg.emissiveScale);
+      propsAndLife.setEmissiveScale(cfg.emissiveScale);
       bloomPass.strength = cfg.bloomStrength;
       bloomPass.radius = cfg.bloomRadius;
       bloomPass.threshold = cfg.bloomThreshold;
