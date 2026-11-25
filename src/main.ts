@@ -19,16 +19,24 @@ import { createRoadAndReflections } from './scene/roadAndReflections';
 import { createBuildings } from './scene/buildings';
 import { createViaductAndVehicles } from './scene/viaductAndVehicles';
 import { createPropsAndLife } from './scene/propsAndLife';
-import { createWeatherAndEffects } from './scene/weatherAndEffects';
+import { createWeatherAndEffects, type PrintEdgeSvgResult } from './scene/weatherAndEffects';
 
 interface SceneControllerAPI {
   setPreset: (preset: PresetName) => void;
   setCamera: (view: CameraView, instant?: boolean) => void;
+  setCameraPose: (
+    pos: [number, number, number],
+    target: [number, number, number],
+    zoom?: number
+  ) => void;
   setMode: (mode: ViewMode) => void;
+  setPrintEdgesVisible: (visible: boolean) => void;
+  getPrintEdgeSVG: (width: number, height: number) => PrintEdgeSvgResult;
   setLang: (lang: LangCode) => void;
   setSimTime: (t: number) => void;
   resumeAuto: () => void;
   ringBell: () => void;
+  triggerAllVehiclePulses: () => void;
   setHudVisible: (visible: boolean) => void;
   getDiagnostics: () => {
     glError: number;
@@ -241,6 +249,7 @@ function boot(): void {
     const isPrint = mode === 'print';
     atmosphere.setPrintMode(isPrint);
     roadAndReflections.setPrintMode(isPrint);
+    buildings.setPrintMode(isPrint);
     viaductAndVehicles.setPrintMode(isPrint);
     propsAndLife.setPrintMode(isPrint);
     weatherAndEffects.setViewMode(mode);
@@ -449,7 +458,7 @@ function boot(): void {
     composer.setSize(w, h);
     bloomPass.setSize(w, h);
     if (manualTimeLock) {
-      renderFrame();
+      needsLockedRender = true;
     }
   };
   window.addEventListener('resize', handleResize);
@@ -464,7 +473,8 @@ function boot(): void {
 
     const tramPos = viaductAndVehicles.getTramPosition();
     const trainPos = viaductAndVehicles.getTrainPosition();
-    weatherAndEffects.update(t, tramPos, trainPos);
+    const minibusPos = viaductAndVehicles.getMinibusPosition();
+    weatherAndEffects.update(t, tramPos, trainPos, minibusPos);
 
     const rainAudio = ATMOSPHERE_PRESETS[currentPreset].rainAudioIntensity;
     soundscape.updateMotion(
@@ -472,6 +482,10 @@ function boot(): void {
       viaductAndVehicles.getTrainProximity(),
       rainAudio
     );
+    if (!manualTimeLock) {
+      const sigT = (((t + 2.1) % 14.0) + 14.0) % 14.0;
+      soundscape.updateTrafficSignal(sigT);
+    }
   };
 
   const clampPanTarget = () => {
@@ -587,18 +601,56 @@ function boot(): void {
 
   // 12. Expose Deterministic Inspection & Automation Controller Hook
   const gl = renderer.getContext();
+  let ctrlRenderPending = false;
+  const flushCtrlRender = () => {
+    if (ctrlRenderPending || needsLockedRender) {
+      ctrlRenderPending = false;
+      needsLockedRender = false;
+      renderFrame();
+    }
+  };
+  const scheduleCtrlRender = () => {
+    needsLockedRender = true;
+    if (!ctrlRenderPending) {
+      ctrlRenderPending = true;
+      queueMicrotask(flushCtrlRender);
+    }
+  };
+
   window.__SCENE_CTRL__ = {
     setPreset: (preset) => {
       applyPresetState(preset);
-      renderFrame();
+      scheduleCtrlRender();
     },
     setCamera: (view, instant = true) => {
       applyCameraView(view, instant);
-      renderFrame();
+      scheduleCtrlRender();
+    },
+    setCameraPose: (pos, target, zoom) => {
+      isTransitioningCam = false;
+      followTram = false;
+      camera.position.set(pos[0], pos[1], pos[2]);
+      controls.target.set(target[0], target[1], target[2]);
+      if (zoom !== undefined) {
+        camera.zoom = zoom;
+      }
+      camera.updateProjectionMatrix();
+      isRenderingFrame = true;
+      controls.update();
+      isRenderingFrame = false;
+      scheduleCtrlRender();
     },
     setMode: (mode) => {
       applyViewModeState(mode);
-      renderFrame();
+      scheduleCtrlRender();
+    },
+    setPrintEdgesVisible: (visible) => {
+      weatherAndEffects.setPrintEdgesVisible(visible);
+      scheduleCtrlRender();
+    },
+    getPrintEdgeSVG: (width, height) => {
+      flushCtrlRender();
+      return weatherAndEffects.getPrintEdgeSVG(camera, renderer, width, height);
     },
     setLang: (lang) => {
       hud.setLang(lang);
@@ -610,7 +662,7 @@ function boot(): void {
       if (currentCameraView === 'tram') {
         applyCameraView('tram', true);
       }
-      renderFrame();
+      scheduleCtrlRender();
     },
     resumeAuto: () => {
       manualTimeLock = false;
@@ -618,24 +670,44 @@ function boot(): void {
     ringBell: () => {
       triggerTramBell();
       updateSimulation(simTime);
-      renderFrame();
+      scheduleCtrlRender();
+    },
+    triggerAllVehiclePulses: () => {
+      weatherAndEffects.triggerBellPulse(viaductAndVehicles.getTramPosition(), simTime);
+      const mbP = viaductAndVehicles.minibusGroup.position;
+      weatherAndEffects.triggerBellPulse(new THREE.Vector3(mbP.x, 1.4, mbP.z), simTime, {
+        followTram: false,
+        colorA: 0x58e8a8,
+        colorB: 0xffd274
+      });
+      const txP = viaductAndVehicles.taxiGroup.position;
+      weatherAndEffects.triggerBellPulse(new THREE.Vector3(txP.x, 0.8, txP.z), simTime, {
+        followTram: false,
+        colorA: 0xff6b5c,
+        colorB: 0xffc864
+      });
+      updateSimulation(simTime);
+      scheduleCtrlRender();
     },
     setHudVisible: (visible) => {
       hud.setVisible(visible);
     },
-    getDiagnostics: () => ({
-      glError: gl.getError(),
-      drawCalls: renderer.info.render.calls,
-      triangles: sceneTriangleCount,
-      meshCount: sceneMeshCount,
-      lang: hud.getLang(),
-      preset: currentPreset,
-      mode: currentViewMode,
-      cameraView: currentCameraView,
-      fps: Math.round(fpsSmoothed),
-      simTime,
-      ready: true
-    })
+    getDiagnostics: () => {
+      flushCtrlRender();
+      return {
+        glError: gl.getError(),
+        drawCalls: renderer.info.render.calls,
+        triangles: sceneTriangleCount,
+        meshCount: sceneMeshCount,
+        lang: hud.getLang(),
+        preset: currentPreset,
+        mode: currentViewMode,
+        cameraView: currentCameraView,
+        fps: Math.round(fpsSmoothed),
+        simTime,
+        ready: true
+      };
+    }
   };
 }
 

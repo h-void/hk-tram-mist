@@ -35,8 +35,8 @@ interface BellPulse {
   startTime: number;
   ringA: THREE.Mesh;
   ringB: THREE.Mesh;
-  matA: THREE.MeshBasicMaterial;
-  matB: THREE.MeshBasicMaterial;
+  matA: THREE.ShaderMaterial;
+  matB: THREE.ShaderMaterial;
 }
 
 interface SteamWisp {
@@ -57,12 +57,84 @@ export interface BellPulseOptions {
   colorB?: number;
 }
 
+export interface PrintEdgeSvgResult {
+  svg: string;
+  stats: {
+    totalSegments: number;
+    visibleSegments: number;
+    paths: number;
+  };
+}
+
 export interface WeatherAndEffectsSystem {
   group: THREE.Group;
   setRainOpacity: (opacity: number) => void;
   setViewMode: (mode: ViewMode) => void;
+  setPrintEdgesVisible: (visible: boolean) => void;
+  getPrintEdgeSVG: (
+    camera: THREE.OrthographicCamera,
+    renderer: THREE.WebGLRenderer,
+    width: number,
+    height: number
+  ) => PrintEdgeSvgResult;
   triggerBellPulse: (origin: THREE.Vector3, simTime: number, pulseOpts?: BellPulseOptions) => void;
-  update: (simTime: number, tramPos: THREE.Vector3, trainPos: THREE.Vector3) => void;
+  update: (
+    simTime: number,
+    tramPos: THREE.Vector3,
+    trainPos: THREE.Vector3,
+    minibusPos: THREE.Vector3
+  ) => void;
+}
+
+/**
+ * Custom GLSL radial acoustic wavefront shader with luminous leading crest,
+ * harmonic inner echo ripple, smooth Gaussian edge feathering, and radial mist fade.
+ */
+function createAcousticWaveMaterial(colorHex: number, initialOpacity = 0.5): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uColor: { value: new THREE.Color(colorHex) },
+      uOpacity: { value: initialOpacity }
+    },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      varying float vMistFade;
+      void main() {
+        vUv = uv;
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vMistFade = 1.0 - smoothstep(15.5, 24.5, length(wp.xz));
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      varying vec2 vUv;
+      varying float vMistFade;
+      void main() {
+        vec2 p = vUv * 2.0 - 1.0;
+        float r = length(p);
+        if (r > 1.0 || r < 0.34) discard;
+        // Crisp glowing primary wavefront crest at r = 0.90 + harmonic trailing echo at r = 0.72 & 0.55
+        float d1 = (r - 0.90) / 0.056;
+        float d2 = (r - 0.72) / 0.066;
+        float d3 = (r - 0.55) / 0.076;
+        float crest = exp(-(d1 * d1));
+        float echo = exp(-(d2 * d2)) * 0.44;
+        float shimmer = exp(-(d3 * d3)) * 0.16;
+        float outerMask = smoothstep(1.0, 0.93, r);
+        float intensity = clamp((crest + echo + shimmer) * outerMask, 0.0, 1.0);
+        float alpha = intensity * uOpacity * vMistFade;
+        if (alpha < 0.006) discard;
+        vec3 col = mix(uColor, vec3(1.0, 0.98, 0.94), crest * 0.36);
+        gl_FragColor = vec4(col, alpha);
+      }
+    `
+  });
 }
 
 function mulberry32(seed: number): () => number {
@@ -287,22 +359,22 @@ export function createWeatherAndEffects(
 
   // =========================================================================
   // 3B. GENTLY RISING WARM-LIT NOODLE-SHOP STEAM WISPS (熱氣騰騰雲吞麵檔白煙)
-  // Curling softly up from outside 明記雲吞麵 (x = -6.2, y = 1.6..3.8, z = 0.45)
+  // Curling softly up from outside 明記雲吞麵 (x = -6.2, y = 1.5..4.1, z = 0.45)
   // =========================================================================
   const steamGroup = new THREE.Group();
   steamGroup.name = 'NoodleShopSteamWisps';
   const steamTex = createSteamWispTexture();
   const steamWisps: SteamWisp[] = [];
-  const STEAM_ORIGIN_X = -6.2;
+  const STEAM_ORIGIN_X = -6.15;
   const STEAM_ORIGIN_Z = 0.45;
-  const STEAM_COUNT = 10;
+  const STEAM_COUNT = 14;
 
   for (let i = 0; i < STEAM_COUNT; i++) {
     const mat = new THREE.SpriteMaterial({
       map: steamTex,
-      color: new THREE.Color(0xffe4be),
+      color: new THREE.Color(0xffe6c2),
       transparent: true,
-      opacity: 0.24,
+      opacity: 0.34,
       depthWrite: false
     });
     const sprite = new THREE.Sprite(mat);
@@ -311,45 +383,37 @@ export function createWeatherAndEffects(
     steamWisps.push({
       sprite,
       mat,
-      dx: (rand() - 0.5) * 0.42,
-      dz: (rand() - 0.5) * 1.15,
-      period: 3.4 + rand() * 1.8,
-      phase: (i / STEAM_COUNT) * 4.2 + rand() * 0.8,
-      baseScale: 0.48 + rand() * 0.24,
-      curlAmp: 0.16 + rand() * 0.16,
+      dx: (rand() - 0.5) * 0.46,
+      dz: (rand() - 0.5) * 1.18,
+      period: 3.1 + rand() * 1.7,
+      phase: (i / STEAM_COUNT) * 4.5 + rand() * 0.7,
+      baseScale: 0.54 + rand() * 0.28,
+      curlAmp: 0.18 + rand() * 0.17,
       rotSpeed: (rand() - 0.5) * 0.55
     });
   }
   group.add(steamGroup);
 
   // =========================================================================
-  // 4. [A] ACOUSTIC FIELD MODE — TRANSLUCENT 3D SOUND WAVEFRONT RINGS
+  // 4. [A] ACOUSTIC FIELD MODE — CUSTOM GLSL MULTI-HARMONIC SOUND WAVEFRONTS
   // =========================================================================
   const acousticGroup = new THREE.Group();
   acousticGroup.name = 'AcousticFieldGroup';
   acousticGroup.visible = false;
 
-  const waveRingGeom = new THREE.RingGeometry(0.92, 1.0, 48);
-  const flatWaveGeom = waveRingGeom.clone();
+  const flatWaveGeom = new THREE.PlaneGeometry(2.0, 2.0);
   flatWaveGeom.rotateX(-Math.PI / 2);
 
-  // Neon transformer 50Hz hum micro-rings around every projecting HK neon sign
+  // Neon transformer 50Hz hum micro-wavefronts around every projecting HK neon sign
   const neonWaveRings: Array<{
     mesh: THREE.Mesh;
-    mat: THREE.MeshBasicMaterial;
+    mat: THREE.ShaderMaterial;
     origin: THREE.Vector3;
     phase: number;
   }> = [];
   opts.neonPositions.forEach((pos, idx) => {
     const colorHex = idx % 3 === 0 ? 0xff7896 : idx % 3 === 1 ? 0x62e8ff : 0xffbe5c;
-    const mat = new THREE.MeshBasicMaterial({
-      color: colorHex,
-      transparent: true,
-      opacity: 0.4,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
+    const mat = createAcousticWaveMaterial(colorHex, 0.52);
     const ring = new THREE.Mesh(flatWaveGeom, mat);
     ring.position.copy(pos);
     ring.renderOrder = 10;
@@ -357,57 +421,64 @@ export function createWeatherAndEffects(
     neonWaveRings.push({ mesh: ring, mat, origin: pos.clone(), phase: idx * 0.72 });
   });
 
-  // Tram ambient rail-hum & periodic acoustic ring + Train steel viaduct resonance ring
-  const tramHumRings: Array<{ mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; offset: number }> = [];
+  // Tram ambient rail-hum, Elevated Train steel viaduct resonance, and Minibus #28 engine wavefronts
+  const tramHumRings: Array<{ mesh: THREE.Mesh; mat: THREE.ShaderMaterial; offset: number }> = [];
   for (let i = 0; i < 3; i++) {
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xffcc64,
-      transparent: true,
-      opacity: 0.45,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
+    const mat = createAcousticWaveMaterial(0xffcc64, 0.58);
     const mesh = new THREE.Mesh(flatWaveGeom, mat);
     mesh.renderOrder = 10;
     acousticGroup.add(mesh);
     tramHumRings.push({ mesh, mat, offset: i / 3 });
   }
 
-  const trainHumRings: Array<{ mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; offset: number }> = [];
+  const trainHumRings: Array<{ mesh: THREE.Mesh; mat: THREE.ShaderMaterial; offset: number }> = [];
   for (let i = 0; i < 3; i++) {
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0x76e0ff,
-      transparent: true,
-      opacity: 0.4,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
+    const mat = createAcousticWaveMaterial(0x76e0ff, 0.54);
     const mesh = new THREE.Mesh(flatWaveGeom, mat);
     mesh.renderOrder = 10;
     acousticGroup.add(mesh);
     trainHumRings.push({ mesh, mat, offset: i / 3 });
   }
 
+  const minibusHumRings: Array<{ mesh: THREE.Mesh; mat: THREE.ShaderMaterial; offset: number }> = [];
+  for (let i = 0; i < 2; i++) {
+    const mat = createAcousticWaveMaterial(0x52e8a4, 0.48);
+    const mesh = new THREE.Mesh(flatWaveGeom, mat);
+    mesh.renderOrder = 10;
+    acousticGroup.add(mesh);
+    minibusHumRings.push({ mesh, mat, offset: i / 2 });
+  }
+
+  // Hong Kong Electronic Audible Crossing Signal emerald pulse rings at both zebra traffic poles
+  const crossingBeepRings: Array<{
+    mesh: THREE.Mesh;
+    mat: THREE.ShaderMaterial;
+    x: number;
+    z: number;
+    offset: number;
+  }> = [];
+  for (const sx of [-5.45, 5.45]) {
+    for (let i = 0; i < 2; i++) {
+      const mat = createAcousticWaveMaterial(0x52ffa8, 0.55);
+      const mesh = new THREE.Mesh(flatWaveGeom, mat);
+      mesh.position.set(sx, 1.38, 2.1);
+      mesh.renderOrder = 10;
+      acousticGroup.add(mesh);
+      crossingBeepRings.push({ mesh, mat, x: sx, z: 2.1, offset: i * 0.5 });
+    }
+  }
+
   // Puddle acoustic rain-impact rings (elevated delicate cyan-white sound blooms)
   const rainAcousticRings: Array<{
     mesh: THREE.Mesh;
-    mat: THREE.MeshBasicMaterial;
+    mat: THREE.ShaderMaterial;
     x: number;
     z: number;
     phase: number;
     period: number;
   }> = [];
   for (let i = 0; i < 10; i++) {
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0x9de6ff,
-      transparent: true,
-      opacity: 0.32,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
+    const mat = createAcousticWaveMaterial(0x9de6ff, 0.42);
     const mesh = new THREE.Mesh(flatWaveGeom, mat);
     const rx = (rand() - 0.5) * 8.6;
     const rz = (rand() - 0.5) * 20.0;
@@ -435,14 +506,7 @@ export function createWeatherAndEffects(
   const triggerBellPulse = (origin: THREE.Vector3, simTime: number, pulseOpts?: BellPulseOptions) => {
     const followTram = pulseOpts?.followTram ?? true;
     const makeBellRing = (hex: number) => {
-      const mat = new THREE.MeshBasicMaterial({
-        color: hex,
-        transparent: true,
-        opacity: 0.85,
-        side: THREE.DoubleSide,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
-      });
+      const mat = createAcousticWaveMaterial(hex, 0.92);
       const ring = new THREE.Mesh(flatWaveGeom, mat);
       ring.position.set(origin.x, origin.y + 1.4, origin.z);
       ring.renderOrder = 11;
@@ -581,6 +645,27 @@ export function createWeatherAndEffects(
   eaveDripsInst.renderOrder = 8;
   group.add(eaveDripsInst);
 
+  // Synchronized tiny landing ripples directly under every awning & viaduct eave drip
+  const dripRippleGroup = new THREE.Group();
+  dripRippleGroup.name = 'EaveDripImpactRipples';
+  const dripImpactRipples: Array<{ mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }> = [];
+  for (const d of dripSeeds) {
+    const rMat = new THREE.MeshBasicMaterial({
+      map: rippleTex,
+      color: 0xbce0f6,
+      transparent: true,
+      opacity: 0.0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const rm = new THREE.Mesh(rippleGeom, rMat);
+    rm.position.set(d.x, d.yBot + 0.012, d.z);
+    rm.renderOrder = 5;
+    dripRippleGroup.add(rm);
+    dripImpactRipples.push({ mesh: rm, mat: rMat });
+  }
+  group.add(dripRippleGroup);
+
   // =========================================================================
   // 5. [P] ARCHIVAL AXONOMETRIC PRINT MODE (Xuan Paper #F4EFE6 + Prussian/Pine/Cinnabar Ink)
   // =========================================================================
@@ -612,6 +697,20 @@ export function createWeatherAndEffects(
     polygonOffsetFactor: 2,
     polygonOffsetUnits: 2
   });
+  // Whisper-delicate botanical Xuan-paper washes for Hong Kong Bauhinia & Weeping Banyan canopies
+  const xuanBauhiniaMat = new THREE.MeshBasicMaterial({
+    color: 0xeddcd7,
+    polygonOffset: true,
+    polygonOffsetFactor: 2,
+    polygonOffsetUnits: 2
+  });
+  const xuanBanyanMat = new THREE.MeshBasicMaterial({
+    color: 0xe0e8de,
+    polygonOffset: true,
+    polygonOffsetFactor: 2,
+    polygonOffsetUnits: 2
+  });
+
   const inkPrussianMat = new THREE.LineBasicMaterial({ color: 0x1e3a5c, transparent: true, opacity: 0.84 });
   const inkPineSootMat = new THREE.LineBasicMaterial({ color: 0x262d34, transparent: true, opacity: 0.72 });
   const inkCinnabarMat = new THREE.LineBasicMaterial({ color: 0xb83b2e, transparent: true, opacity: 0.92 });
@@ -706,17 +805,23 @@ export function createWeatherAndEffects(
 
           const isHeroAccent = isInsideAncestor(obj, tramGroup) || isInsideAncestor(obj, taxiGroup);
           const isRoadOrRail = isInsideAncestor(obj, road);
+          const botanical = obj.userData.printBotanical as 'bauhinia' | 'banyan' | undefined;
 
           if (obj instanceof THREE.InstancedMesh) {
             obj.material = xuanWarmTintMat;
             return;
           }
 
-          obj.material = isHeroAccent
-            ? xuanCinnabarTintMat
-            : isRoadOrRail
-            ? xuanPaperMat
-            : xuanWarmTintMat;
+          obj.material =
+            botanical === 'bauhinia'
+              ? xuanBauhiniaMat
+              : botanical === 'banyan'
+              ? xuanBanyanMat
+              : isHeroAccent
+              ? xuanCinnabarTintMat
+              : isRoadOrRail
+              ? xuanPaperMat
+              : xuanWarmTintMat;
 
           // Generate crisp architectural ink edges on primary solid meshes
           // (respect userData.skipPrintEdges on meshes & parent groups so archival engraving stays clean!)
@@ -728,15 +833,18 @@ export function createWeatherAndEffects(
           ) {
             const edgesGeom = new THREE.EdgesGeometry(obj.geometry, 26);
             if (edgesGeom.attributes.position && edgesGeom.attributes.position.count > 0) {
-              const lineMat = isHeroAccent
-                ? inkCinnabarMat
-                : isRoadOrRail
-                ? inkPineSootMat
-                : inkPrussianMat;
+              const inkRole = isHeroAccent ? 'cinnabar' : isRoadOrRail ? 'pine' : 'prussian';
+              const lineMat =
+                inkRole === 'cinnabar'
+                  ? inkCinnabarMat
+                  : inkRole === 'pine'
+                  ? inkPineSootMat
+                  : inkPrussianMat;
               const edgeLine = new THREE.LineSegments(edgesGeom, lineMat);
               edgeLine.matrixAutoUpdate = false;
               edgeLine.matrix.copy(obj.matrixWorld);
               edgeLine.userData.sourceMesh = obj;
+              edgeLine.userData.inkRole = inkRole;
               printEdgesGroup!.add(edgeLine);
             } else {
               edgesGeom.dispose();
@@ -762,6 +870,225 @@ export function createWeatherAndEffects(
     }
   };
 
+  /**
+   * Native 3x Orthographic 24-bit Depth-Buffered Hidden-Line-Removed Vector SVG Exporter.
+   * Projects live 26-degree architectural edges into crisp layered <path> ink groups
+   * (Prussian blue, pine soot, cinnabar red) with segmented radial Xuan-paper fade.
+   */
+  const getPrintEdgeSVG = (
+    camera: THREE.OrthographicCamera,
+    renderer: THREE.WebGLRenderer,
+    width: number,
+    height: number
+  ): PrintEdgeSvgResult => {
+    if (!printEdgesGroup || !printModeActive) {
+      return {
+        svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}"></svg>`,
+        stats: { totalSegments: 0, visibleSegments: 0, paths: 0 }
+      };
+    }
+
+    const scale = 3;
+    const rtW = Math.max(64, Math.round(width * scale));
+    const rtH = Math.max(64, Math.round(height * scale));
+    const rt = new THREE.WebGLRenderTarget(rtW, rtH, {
+      minFilter: THREE.NearestFilter,
+      magFilter: THREE.NearestFilter,
+      format: THREE.RGBAFormat,
+      type: THREE.UnsignedByteType,
+      depthBuffer: true,
+      stencilBuffer: false
+    });
+
+    const depthMat = new THREE.ShaderMaterial({
+      polygonOffset: true,
+      polygonOffsetFactor: 2,
+      polygonOffsetUnits: 2,
+      vertexShader: /* glsl */ `
+        void main() {
+          vec4 mv = vec4(position, 1.0);
+          #ifdef USE_INSTANCING
+            mv = instanceMatrix * mv;
+          #endif
+          gl_Position = projectionMatrix * modelViewMatrix * mv;
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        void main() {
+          float z = clamp(gl_FragCoord.z, 0.0, 1.0);
+          float s = floor(z * 16777215.0 + 0.5);
+          float r = floor(s / 65536.0);
+          float g = floor(mod(s, 65536.0) / 256.0);
+          float b = mod(s, 256.0);
+          gl_FragColor = vec4(r / 255.0, g / 255.0, b / 255.0, 1.0);
+        }
+      `
+    });
+
+    const prevOverride = scene.overrideMaterial;
+    const prevEdgesVis = printEdgesGroup.visible;
+    const prevWeatherVis = group.visible;
+    const prevRT = renderer.getRenderTarget();
+    const prevClearCol = new THREE.Color();
+    renderer.getClearColor(prevClearCol);
+    const prevClearAlpha = renderer.getClearAlpha();
+
+    // Hide lines & weather sprites; render exact solid occluder depth map
+    printEdgesGroup.visible = false;
+    group.visible = false;
+    scene.overrideMaterial = depthMat;
+    camera.updateMatrixWorld(true);
+    scene.updateMatrixWorld(true);
+
+    renderer.setRenderTarget(rt);
+    renderer.setClearColor(0xffffff, 1);
+    renderer.clear(true, true, false);
+    renderer.render(scene, camera);
+
+    const pixels = new Uint8Array(rtW * rtH * 4);
+    renderer.readRenderTargetPixels(rt, 0, 0, rtW, rtH, pixels);
+
+    // Restore renderer & scene cleanly
+    renderer.setRenderTarget(prevRT);
+    renderer.setClearColor(prevClearCol, prevClearAlpha);
+    scene.overrideMaterial = prevOverride;
+    printEdgesGroup.visible = prevEdgesVis;
+    group.visible = prevWeatherVis;
+    rt.dispose();
+    depthMat.dispose();
+
+    const sampleMaxDepth = (sx: number, sy: number): number => {
+      const cx = Math.min(rtW - 1, Math.max(0, Math.round(sx * scale)));
+      const cy = Math.min(rtH - 1, Math.max(0, Math.round((height - sy) * scale)));
+      let maxD = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        const py = Math.min(rtH - 1, Math.max(0, cy + dy));
+        for (let dx = -1; dx <= 1; dx++) {
+          const px = Math.min(rtW - 1, Math.max(0, cx + dx));
+          const idx = (py * rtW + px) * 4;
+          const d = (pixels[idx] * 65536 + pixels[idx + 1] * 256 + pixels[idx + 2]) / 16777215.0;
+          if (d > maxD) maxD = d;
+        }
+      }
+      return maxD;
+    };
+
+    const smoothstep = (e0: number, e1: number, x: number): number => {
+      const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+      return t * t * (3 - 2 * t);
+    };
+
+    const roleCfg: Record<
+      'prussian' | 'pine' | 'cinnabar',
+      { stroke: string; baseOp: number; width: string; innerR: number; outerR: number }
+    > = {
+      prussian: { stroke: '#1e3a5c', baseOp: 0.875, width: '0.42', innerR: 16.5, outerR: 24.5 },
+      pine: { stroke: '#262d34', baseOp: 0.75, width: '0.40', innerR: 16.0, outerR: 24.0 },
+      cinnabar: { stroke: '#b83b2e', baseOp: 1.0, width: '0.48', innerR: 17.5, outerR: 25.5 }
+    };
+
+    const buckets = new Map<string, { stroke: string; opacity: string; width: string; segs: string[] }>();
+    const v0 = new THREE.Vector3();
+    const v1 = new THREE.Vector3();
+    const pA = new THREE.Vector3();
+    const pB = new THREE.Vector3();
+    const pM = new THREE.Vector3();
+    const nA = new THREE.Vector3();
+    const nB = new THREE.Vector3();
+    const nM = new THREE.Vector3();
+    const mvp = new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    const DEPTH_BIAS = 0.00145;
+
+    let totalSegments = 0;
+    let visibleSegments = 0;
+
+    for (const ch of printEdgesGroup.children) {
+      if (!(ch instanceof THREE.LineSegments)) continue;
+      const role = (ch.userData.inkRole as 'prussian' | 'pine' | 'cinnabar' | undefined) ?? 'prussian';
+      const cfg = roleCfg[role];
+      const posAttr = ch.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+      if (!posAttr) continue;
+      const matW = ch.matrix;
+
+      for (let i = 0; i < posAttr.count; i += 2) {
+        v0.fromBufferAttribute(posAttr, i).applyMatrix4(matW);
+        v1.fromBufferAttribute(posAttr, i + 1).applyMatrix4(matW);
+        const worldLen = v0.distanceTo(v1);
+        if (worldLen < 0.015) continue;
+
+        const subSteps = Math.max(1, Math.min(28, Math.ceil(worldLen / 0.55)));
+        for (let s = 0; s < subSteps; s++) {
+          totalSegments++;
+          const t0 = s / subSteps;
+          const t1 = (s + 1) / subSteps;
+          pA.lerpVectors(v0, v1, t0);
+          pB.lerpVectors(v0, v1, t1);
+          pM.lerpVectors(pA, pB, 0.5);
+
+          nA.copy(pA).applyMatrix4(mvp);
+          nB.copy(pB).applyMatrix4(mvp);
+          nM.copy(pM).applyMatrix4(mvp);
+
+          const x0 = (nA.x * 0.5 + 0.5) * width;
+          const y0 = (0.5 - nA.y * 0.5) * height;
+          const x1 = (nB.x * 0.5 + 0.5) * width;
+          const y1 = (0.5 - nB.y * 0.5) * height;
+          if (
+            (x0 < -2 && x1 < -2) ||
+            (x0 > width + 2 && x1 > width + 2) ||
+            (y0 < -2 && y1 < -2) ||
+            (y0 > height + 2 && y1 > height + 2)
+          ) {
+            continue;
+          }
+          if (Math.hypot(x1 - x0, y1 - y0) < 0.25) continue;
+
+          const xm = (x0 + x1) * 0.5;
+          const ym = (y0 + y1) * 0.5;
+          const zM = nM.z * 0.5 + 0.5;
+          if (zM > sampleMaxDepth(xm, ym) + DEPTH_BIAS) continue;
+
+          const distXZ = Math.hypot(pM.x, pM.z);
+          const mistT = smoothstep(cfg.innerR, cfg.outerR, distXZ);
+          const mistSmooth = mistT * mistT * (3 - 2 * mistT);
+          const rawOp = cfg.baseOp * (1 - mistSmooth);
+          if (rawOp < 0.075) continue;
+
+          const qOp =
+            role === 'cinnabar' && rawOp > 0.9
+              ? 1.0
+              : Math.max(0.1, Math.min(cfg.baseOp, Math.round(rawOp * 8) / 8));
+          const opStr = qOp.toFixed(3);
+          const bKey = `${role}_${opStr}`;
+          let bucket = buckets.get(bKey);
+          if (!bucket) {
+            bucket = { stroke: cfg.stroke, opacity: opStr, width: cfg.width, segs: [] };
+            buckets.set(bKey, bucket);
+          }
+          bucket.segs.push(`M${x0.toFixed(1)} ${y0.toFixed(1)}L${x1.toFixed(1)} ${y1.toFixed(1)}`);
+          visibleSegments++;
+        }
+      }
+    }
+
+    // Emit pine soot first, then Prussian blue, then cinnabar hero accent on top
+    const orderRank = (k: string) => (k.startsWith('pine') ? 0 : k.startsWith('prussian') ? 1 : 2);
+    const sortedKeys = Array.from(buckets.keys()).sort((a, b) => {
+      const dr = orderRank(a) - orderRank(b);
+      return dr !== 0 ? dr : a.localeCompare(b);
+    });
+
+    const pathTags = sortedKeys.map((k) => {
+      const b = buckets.get(k)!;
+      return `<path d="${b.segs.join('')}" fill="none" stroke="${b.stroke}" stroke-opacity="${b.opacity}" stroke-width="${b.width}" stroke-linecap="round"/>`;
+    });
+
+    return {
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="none">${pathTags.join('')}</svg>`,
+      stats: { totalSegments, visibleSegments, paths: pathTags.length }
+    };
+  };
+
   let currentViewMode: ViewMode = 'diorama';
   let currentRainBaseOpacity = 0.16;
 
@@ -771,6 +1098,7 @@ export function createWeatherAndEffects(
     const isPrint = mode === 'print';
     rainLines.visible = !isPrint;
     rippleGroup.visible = !isPrint;
+    dripRippleGroup.visible = !isPrint;
     petalInst.visible = !isPrint;
     steamGroup.visible = !isPrint;
     bellBurstGroup.visible = !isPrint;
@@ -779,11 +1107,22 @@ export function createWeatherAndEffects(
     buildOrShowPrintMode(isPrint);
   };
 
+  const setPrintEdgesVisible = (visible: boolean) => {
+    if (printEdgesGroup) {
+      printEdgesGroup.visible = visible;
+    }
+  };
+
   const dummy = new THREE.Object3D();
-  const steamWarmColor = new THREE.Color(0xffe4bc);
+  const steamWarmColor = new THREE.Color(0xffe6be);
   const steamCoolColor = new THREE.Color(0xd2e2f0);
 
-  const update = (simTime: number, tramPos: THREE.Vector3, trainPos: THREE.Vector3) => {
+  const update = (
+    simTime: number,
+    tramPos: THREE.Vector3,
+    trainPos: THREE.Vector3,
+    minibusPos: THREE.Vector3
+  ) => {
     // 1. Update delicate diagonal falling rain streaks deterministically from simTime
     if (rainLines.visible) {
       const posAttr = rainGeom.getAttribute('position') as THREE.BufferAttribute;
@@ -809,7 +1148,7 @@ export function createWeatherAndEffects(
         const u = t / rp.period;
         const sc = 0.14 + u * rp.maxScale;
         rp.mesh.scale.set(sc, 1, sc);
-        rp.mat.opacity = Math.sin(u * Math.PI) * 0.13 * Math.min(1.45, currentRainBaseOpacity / 0.16);
+        rp.mat.opacity = Math.sin(u * Math.PI) * 0.14 * Math.min(1.45, currentRainBaseOpacity / 0.16);
       }
     }
 
@@ -836,21 +1175,21 @@ export function createWeatherAndEffects(
     if (steamGroup.visible) {
       for (const w of steamWisps) {
         const t = (((simTime + w.phase) % w.period) + w.period) % w.period;
-        const u = t / w.period; // 0 -> 1 as wisp rises from y = 1.6 to y = 3.8
-        const curlX = Math.sin(u * Math.PI * 2.0 + w.phase) * w.curlAmp + u * 0.28;
-        const curlZ = Math.cos(u * Math.PI * 1.6 + w.phase * 1.3) * (w.curlAmp * 0.85) + u * 0.14;
+        const u = t / w.period; // 0 -> 1 as wisp rises from y = 1.55 to y = 4.05
+        const curlX = Math.sin(u * Math.PI * 2.0 + w.phase) * w.curlAmp + u * 0.32;
+        const curlZ = Math.cos(u * Math.PI * 1.6 + w.phase * 1.3) * (w.curlAmp * 0.85) + u * 0.15;
         w.sprite.position.set(
           STEAM_ORIGIN_X + w.dx + curlX,
-          1.6 + u * 2.2,
+          1.55 + u * 2.5,
           STEAM_ORIGIN_Z + w.dz + curlZ
         );
-        const sc = w.baseScale * (0.68 + u * 1.48);
-        w.sprite.scale.set(sc, sc * 1.12, 1);
+        const sc = w.baseScale * (0.70 + u * 1.52);
+        w.sprite.scale.set(sc, sc * 1.14, 1);
         w.mat.rotation = w.phase + simTime * w.rotSpeed;
         // Soft warm amber-cream near awning transitioning smoothly into cool rainy mist aloft
-        w.mat.color.copy(steamWarmColor).lerp(steamCoolColor, u * 0.65);
-        const fadeEnv = Math.sin(u * Math.PI) * (1.0 - u * 0.28);
-        w.mat.opacity = fadeEnv * 0.28;
+        w.mat.color.copy(steamWarmColor).lerp(steamCoolColor, u * 0.62);
+        const fadeEnv = Math.sin(u * Math.PI) * (1.0 - u * 0.24);
+        w.mat.opacity = fadeEnv * 0.36;
       }
     }
 
@@ -873,7 +1212,7 @@ export function createWeatherAndEffects(
       }
     }
 
-    // 3D. Update falling eave rain drips (gravity-accelerated droplets off awnings & viaduct spouts)
+    // 3D. Update falling eave rain drips & synchronized ground impact splash ripples
     if (eaveDripsInst.visible) {
       for (let i = 0; i < dripSeeds.length; i++) {
         const d = dripSeeds[i];
@@ -889,46 +1228,84 @@ export function createWeatherAndEffects(
         dummy.scale.set(sxz, sy, sxz);
         dummy.updateMatrix();
         eaveDripsInst.setMatrixAt(i, dummy.matrix);
+
+        // Impact splash ripple blooms right after drop hits (u wraps past 1.0 into 0..0.38)
+        const rip = dripImpactRipples[i];
+        if (u < 0.42) {
+          const ru = u / 0.42;
+          const rSc = 0.08 + ru * 0.34;
+          rip.mesh.scale.set(rSc, 1, rSc);
+          rip.mat.opacity = Math.sin(ru * Math.PI) * 0.24 * Math.min(1.4, currentRainBaseOpacity / 0.16);
+        } else {
+          rip.mat.opacity = 0.0;
+        }
       }
       eaveDripsInst.instanceMatrix.needsUpdate = true;
     }
 
-    // 4. Update [A] Acoustic Field wavefront rings
+    // 4. Update [A] Acoustic Field custom GLSL multi-harmonic wavefronts
     if (currentViewMode === 'acoustic') {
+      const sigClock = simTime + 2.1;
+      const sigT = ((sigClock % 14.0) + 14.0) % 14.0;
+
       for (const nw of neonWaveRings) {
         const u = (((simTime * 0.68 + nw.phase) % 1.0) + 1.0) % 1.0;
-        const r = 0.35 + u * 2.15;
+        const r = 0.40 + u * 2.35;
         nw.mesh.position.copy(nw.origin);
         nw.mesh.scale.set(r, 1, r);
-        nw.mat.opacity = (1 - u) * (1 - u) * 0.56;
+        nw.mat.uniforms.uOpacity.value = (1 - u) * (1 - u) * 0.68;
       }
 
       for (const tw of tramHumRings) {
         const u = (((simTime * 0.52 + tw.offset) % 1.0) + 1.0) % 1.0;
-        const r = 0.85 + u * 5.2;
+        const r = 0.95 + u * 5.4;
         tw.mesh.position.set(tramPos.x, 0.24, tramPos.z);
         tw.mesh.scale.set(r, 1, r);
-        tw.mat.opacity = (1 - u) * 0.52;
+        tw.mat.uniforms.uOpacity.value = (1 - u) * 0.64;
       }
 
       for (const rw of trainHumRings) {
         const u = (((simTime * 0.62 + rw.offset) % 1.0) + 1.0) % 1.0;
-        const r = 1.0 + u * 4.8;
+        const r = 1.05 + u * 5.0;
         rw.mesh.position.set(trainPos.x, trainPos.y - 0.9, trainPos.z);
         rw.mesh.scale.set(r, 1, r);
-        rw.mat.opacity = (1 - u) * 0.44;
+        rw.mat.uniforms.uOpacity.value = (1 - u) * 0.56;
+      }
+
+      for (const mw of minibusHumRings) {
+        const u = (((simTime * 0.72 + mw.offset) % 1.0) + 1.0) % 1.0;
+        const r = 0.75 + u * 3.4;
+        mw.mesh.position.set(minibusPos.x, 0.24, minibusPos.z);
+        mw.mesh.scale.set(r, 1, r);
+        mw.mat.uniforms.uOpacity.value = (1 - u) * 0.52;
+      }
+
+      // Hong Kong pedestrian audible crossing signal emerald wavefronts synced to 14s HK clock!
+      const crossingActive = sigT < 8.5;
+      const crossingRate = sigT >= 6.0 ? 2.8 : 1.15;
+      for (const cw of crossingBeepRings) {
+        if (!crossingActive) {
+          cw.mesh.visible = false;
+          continue;
+        }
+        cw.mesh.visible = true;
+        const u = (((simTime * crossingRate + cw.offset) % 1.0) + 1.0) % 1.0;
+        const r = 0.35 + u * 2.55;
+        cw.mesh.position.set(cw.x, 1.38 + u * 0.32, cw.z);
+        cw.mesh.scale.set(r, 1, r);
+        cw.mat.uniforms.uOpacity.value = (1 - u) * (1 - u) * 0.62;
       }
 
       for (const aw of rainAcousticRings) {
         const u = ((((simTime + aw.phase) % aw.period) + aw.period) % aw.period) / aw.period;
-        const r = 0.25 + u * 1.9;
+        const r = 0.30 + u * 2.05;
         aw.mesh.position.set(aw.x, 0.14 + u * 0.55, aw.z);
         aw.mesh.scale.set(r, 1, r);
-        aw.mat.opacity = (1 - u) * 0.36;
+        aw.mat.uniforms.uOpacity.value = (1 - u) * 0.44;
       }
     }
 
-    // 5. Update Interactive Tram Bell Double-Ding Wavefront Pulses ("叮-叮!")
+    // 5. Update Interactive Tram Bell Double-Ding & Horn Wavefront Pulses ("叮-叮!")
     for (let i = activeBellPulses.length - 1; i >= 0; i--) {
       const bp = activeBellPulses[i];
       const dtA = simTime - bp.startTime;
@@ -949,18 +1326,18 @@ export function createWeatherAndEffects(
       const pz = bp.followTram ? tramPos.z : bp.origin.z;
 
       const uA = Math.min(1, Math.max(0, dtA / dur));
-      const rA = 0.45 + uA * (bp.followTram ? 8.2 : 5.4);
+      const rA = 0.55 + uA * (bp.followTram ? 8.4 : 5.6);
       bp.ringA.position.set(px, py + uA * 0.5, pz);
       bp.ringA.scale.set(rA, 1, rA);
-      bp.matA.opacity = (1 - uA) * (1 - uA) * 0.92;
+      bp.matA.uniforms.uOpacity.value = (1 - uA) * (1 - uA) * 0.96;
 
       if (dtB >= 0 && dtB <= dur) {
         const uB = dtB / dur;
-        const rB = 0.45 + uB * (bp.followTram ? 7.8 : 5.0);
+        const rB = 0.55 + uB * (bp.followTram ? 8.0 : 5.2);
         bp.ringB.visible = true;
         bp.ringB.position.set(px, py + 0.3 + uB * 0.5, pz);
         bp.ringB.scale.set(rB, 1, rB);
-        bp.matB.opacity = (1 - uB) * (1 - uB) * 0.88;
+        bp.matB.uniforms.uOpacity.value = (1 - uB) * (1 - uB) * 0.90;
       } else {
         bp.ringB.visible = false;
       }
@@ -988,6 +1365,8 @@ export function createWeatherAndEffects(
       rainMat.uniforms.uOpacity.value = opacity;
     },
     setViewMode,
+    setPrintEdgesVisible,
+    getPrintEdgeSVG,
     triggerBellPulse,
     update
   };

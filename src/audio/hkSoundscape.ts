@@ -3,7 +3,8 @@
  * - Filtered stereo rain bed + tin-roof pitter-patter droplets
  * - Subtle 50/100Hz Hong Kong neon transformer hum
  * - Distant steel rail rumble modulated by tram & metro proximity
- * - Authentic Hong Kong double-decker tram metallic double-ding bell ("叮叮!")
+ * - Phase-locked Hong Kong audible pedestrian crossing signal (steady & flashing green man cadence)
+ * - Authentic Hong Kong double-decker tram metallic double-ding bell ("叮叮!") & polite vehicle horns
  */
 
 export class HKSoundscape {
@@ -14,6 +15,7 @@ export class HKSoundscape {
   private humGain: GainNode | null = null;
   private dropletTimer: number | null = null;
   private noiseBuffer: AudioBuffer | null = null;
+  private lastCrossingBeepTime = -1;
   private unlocked = false;
   private muted = true; // Starts silent until user gesture or unmute toggle
   private userExplicitlyMuted = false;
@@ -209,6 +211,69 @@ export class HKSoundscape {
     const rumbleLevel = 0.05 + tramProximity * 0.16 + trainProximity * 0.24;
     this.rumbleGain.gain.setTargetAtTime(rumbleLevel, now, 0.12);
     this.rainGain.gain.setTargetAtTime(0.2 + rainIntensity * 0.18, now, 0.25);
+  }
+
+  /**
+   * Authentic Hong Kong Electronic Audible Traffic Signal (電子行人過路發聲裝置):
+   * - Steady Green Man (sigT < 6.0s): calm 1.25 Hz cadence (0.80s interval)
+   * - Flashing Green Man (6.0 <= sigT < 8.5s): iconic rapid 6.25 Hz urgent tick (0.16s interval)
+   * - Red Man (sigT >= 8.5s): silent
+   * Routed through masterGain so it blends gently into the rainy ambiance and respects mute.
+   */
+  public updateTrafficSignal(sigT: number): void {
+    if (!this.ctx || !this.masterGain || this.muted || this.ctx.state !== 'running') return;
+    if (sigT >= 8.5) return; // Silent during Red Man
+
+    const urgent = sigT >= 6.0;
+    const interval = urgent ? 0.16 : 0.80;
+    const now = this.ctx.currentTime;
+    if (this.lastCrossingBeepTime >= 0 && now - this.lastCrossingBeepTime < interval * 0.92) {
+      return;
+    }
+    this.lastCrossingBeepTime = now;
+    this.playCrossingTick(urgent);
+  }
+
+  private playCrossingTick(urgent: boolean): void {
+    if (!this.ctx || !this.masterGain) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime + 0.004;
+    const dur = urgent ? 0.042 : 0.058;
+
+    const env = ctx.createGain();
+    const peak = urgent ? 0.030 : 0.024;
+    env.gain.setValueAtTime(0.0001, now);
+    env.gain.linearRampToValueAtTime(peak, now + 0.004);
+    env.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 2150;
+
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = 0.16;
+
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(urgent ? 820 : 760, now);
+
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(urgent ? 1640 : 1520, now);
+    const h2Gain = ctx.createGain();
+    h2Gain.gain.value = 0.24;
+
+    osc1.connect(env);
+    osc2.connect(h2Gain);
+    h2Gain.connect(env);
+    env.connect(lp);
+    lp.connect(pan);
+    pan.connect(this.masterGain);
+
+    osc1.start(now);
+    osc2.start(now);
+    osc1.stop(now + dur + 0.015);
+    osc2.stop(now + dur + 0.015);
   }
 
   /**
