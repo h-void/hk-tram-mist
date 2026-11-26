@@ -533,9 +533,9 @@ body.mode-print .hud-source-link:hover {
   }
 }
 
-/* Phones: wrap the dock into two centred rows (atmosphere + camera / modes + actions)
-   so every control stays visible instead of hiding behind a scrollbar-less overflow. */
-@media (max-width: 640px) {
+/* Tablets & phones (<= 840px): wrap the dock into two centred rows (atmosphere + camera / modes + actions)
+   so every control (including Print [P] SVG export) stays visible without scrollbar-less clipping. */
+@media (max-width: 840px) {
   .hud-dock {
     flex-wrap: wrap;
     justify-content: center;
