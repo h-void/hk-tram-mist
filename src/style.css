@@ -260,6 +260,22 @@ body.mode-print .hud-btn.active-cyan {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+.hud-btn-hidden {
+  display: none !important;
+}
+
+.hud-btn-svg {
+  color: #1e3a5c;
+  background: rgba(30, 58, 92, 0.08);
+  border-color: rgba(30, 58, 92, 0.30);
+}
+
+.hud-btn-svg:hover {
+  color: #b83b2e;
+  background: rgba(184, 59, 46, 0.12);
+  border-color: rgba(184, 59, 46, 0.48);
+}
+
 .hud-topright {
   position: fixed;
   top: 22px;
@@ -415,6 +431,71 @@ body.mode-print .hud-source-link:hover {
   to {
     transform: translateX(128%);
   }
+}
+
+.boot-card.boot-fallback {
+  max-width: min(460px, calc(100vw - 32px));
+  padding: 20px 22px 22px;
+}
+
+.boot-fallback-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1200 / 630;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-top: 12px;
+  border: 1px solid rgba(224, 238, 252, 0.22);
+}
+
+.boot-fallback-copy {
+  margin-top: 12px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: rgba(236, 244, 252, 0.92);
+}
+
+.boot-fallback-zh {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(210, 226, 244, 0.84);
+}
+
+.boot-reload-btn {
+  margin-top: 15px;
+  appearance: none;
+  border: 1px solid rgba(246, 194, 116, 0.58);
+  background: rgba(246, 194, 116, 0.22);
+  color: rgba(246, 250, 255, 0.98);
+  font-family: var(--font-hk);
+  font-size: 12.5px;
+  letter-spacing: 0.06em;
+  padding: 8px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.boot-reload-btn:hover {
+  background: rgba(246, 194, 116, 0.34);
+  border-color: rgba(246, 194, 116, 0.85);
+}
+
+.boot-reload-btn:active {
+  transform: scale(0.97);
+}
+
+#context-lost-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(14, 22, 34, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 @media (max-width: 960px) {

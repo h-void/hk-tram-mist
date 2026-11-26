@@ -7,9 +7,14 @@
  * - Authentic Hong Kong double-decker tram metallic double-ding bell ("叮叮!") & polite vehicle horns
  */
 
+import type { HKSignalState } from '../scene/hkSignal';
+
+export type SoundState = 'idle' | 'on' | 'muted';
+
 export class HKSoundscape {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  private sfxGain: GainNode | null = null;
   private rainGain: GainNode | null = null;
   private rumbleGain: GainNode | null = null;
   private humGain: GainNode | null = null;
@@ -20,17 +25,41 @@ export class HKSoundscape {
   private muted = true; // Starts silent until user gesture or unmute toggle
   private userExplicitlyMuted = false;
 
+  private readonly handleVisibilityChange = (): void => {
+    if (!this.ctx) return;
+    if (document.hidden) {
+      if (this.ctx.state === 'running') {
+        void this.ctx.suspend();
+      }
+    } else if (!this.muted && this.ctx.state !== 'running') {
+      void this.ctx.resume();
+    }
+  };
+
+  constructor() {
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+  }
+
+  private ensureContextRunning(): void {
+    // Handles both 'suspended' and iOS Safari's 'interrupted' AudioContext state
+    if (this.ctx && this.ctx.state !== 'running') {
+      void this.ctx.resume();
+    }
+  }
+
   public unlockAndStart(autoUnmute = false): void {
     if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtx) return;
       this.ctx = new AudioCtx();
       this.setupGraph();
     }
 
-    if (this.ctx.state === 'suspended') {
-      void this.ctx.resume();
-    }
+    this.ensureContextRunning();
 
     this.unlocked = true;
     if (autoUnmute && !this.userExplicitlyMuted) {
@@ -42,16 +71,35 @@ export class HKSoundscape {
     return this.muted;
   }
 
+  public getSoundState(): SoundState {
+    if (!this.muted) return 'on';
+    return this.userExplicitlyMuted ? 'muted' : 'idle';
+  }
+
   public setMuted(muted: boolean): void {
     this.muted = muted;
     this.userExplicitlyMuted = muted;
-    if (!muted && !this.unlocked) {
-      this.unlockAndStart(false);
+    if (!muted) {
+      if (!this.unlocked) {
+        this.unlockAndStart(false);
+      } else {
+        this.ensureContextRunning();
+      }
     }
     if (this.ctx && this.masterGain) {
       const now = this.ctx.currentTime;
       this.masterGain.gain.cancelScheduledValues(now);
       this.masterGain.gain.setTargetAtTime(muted ? 0.0 : 0.42, now, 0.18);
+    }
+    if (this.ctx && this.sfxGain) {
+      const now = this.ctx.currentTime;
+      this.sfxGain.gain.cancelScheduledValues(now);
+      if (muted) {
+        this.sfxGain.gain.setTargetAtTime(0.0, now, 0.02);
+      } else {
+        this.sfxGain.gain.setValueAtTime(this.sfxGain.gain.value, now);
+        this.sfxGain.gain.linearRampToValueAtTime(1.0, now + 0.012);
+      }
     }
   }
 
@@ -67,6 +115,10 @@ export class HKSoundscape {
     this.masterGain = ctx.createGain();
     this.masterGain.gain.value = 0.0;
     this.masterGain.connect(ctx.destination);
+
+    this.sfxGain = ctx.createGain();
+    this.sfxGain.gain.value = 0.0;
+    this.sfxGain.connect(ctx.destination);
 
     // Pre-generate 3s pink-ish noise buffer
     const sampleRate = ctx.sampleRate;
@@ -166,7 +218,13 @@ export class HKSoundscape {
 
     // 4. Tin-roof / awning raindrop pitter-patter scheduler
     this.dropletTimer = window.setInterval(() => {
-      if (!this.ctx || !this.masterGain || !this.noiseBuffer || this.muted || this.ctx.state !== 'running') {
+      if (
+        !this.ctx ||
+        !this.masterGain ||
+        !this.noiseBuffer ||
+        this.muted ||
+        this.ctx.state !== 'running'
+      ) {
         return;
       }
       if (Math.random() < 0.62) {
@@ -215,17 +273,17 @@ export class HKSoundscape {
 
   /**
    * Authentic Hong Kong Electronic Audible Traffic Signal (電子行人過路發聲裝置):
-   * - Steady Green Man (sigT < 6.0s): calm 1.25 Hz cadence (0.80s interval)
-   * - Flashing Green Man (6.0 <= sigT < 8.5s): iconic rapid 6.25 Hz urgent tick (0.16s interval)
-   * - Red Man (sigT >= 8.5s): silent
+   * - Steady Green Man (0.0 <= sigT < 5.2s): calm 1.25 Hz cadence (0.80s interval)
+   * - Flashing Green Man (5.2 <= sigT < 7.7s): iconic rapid 6.25 Hz urgent tick (0.16s interval)
+   * - Red Man (sigT >= 7.7s): silent
    * Routed through masterGain so it blends gently into the rainy ambiance and respects mute.
    */
-  public updateTrafficSignal(sigT: number): void {
+  public updateTrafficSignal(signal: HKSignalState): void {
     if (!this.ctx || !this.masterGain || this.muted || this.ctx.state !== 'running') return;
-    if (sigT >= 8.5) return; // Silent during Red Man
+    if (!signal.crossingAudioActive) return;
 
-    const urgent = sigT >= 6.0;
-    const interval = urgent ? 0.16 : 0.80;
+    const urgent = signal.crossingAudioUrgent;
+    const interval = signal.crossingAudioInterval;
     const now = this.ctx.currentTime;
     if (this.lastCrossingBeepTime >= 0 && now - this.lastCrossingBeepTime < interval * 0.92) {
       return;
@@ -278,31 +336,31 @@ export class HKSoundscape {
 
   /**
    * Authentic Hong Kong Tramways metallic foot-gong double-ding ("叮叮!").
-   * Always audible when explicitly triggered by clicking the tram or pressing Space
-   * (if audio context is running or after gesture unlock).
+   * Respects explicit mute honestly (100% silent when user explicitly muted).
+   * In the initial pre-gesture idle state, clicking/ringing cleanly enables audio so HUD and audio stay in sync.
    */
-  public ringTramBell(): void {
-    if (this.userExplicitlyMuted) return;
-    if (!this.unlocked) {
-      this.unlockAndStart(false);
+  public ringTramBell(): boolean {
+    if (this.userExplicitlyMuted) return false;
+    if (this.muted) {
+      this.setMuted(false);
+    } else {
+      this.ensureContextRunning();
     }
-    if (!this.ctx) return;
-    if (this.ctx.state === 'suspended') {
-      void this.ctx.resume();
-    }
+    if (!this.ctx || !this.sfxGain) return false;
 
     const now = this.ctx.currentTime + 0.015;
     this.strikeBell(now, 1285, 0.26);
     this.strikeBell(now + 0.165, 1302, 0.30);
+    return true;
   }
 
   private strikeBell(startTime: number, fundamental: number, gainLevel: number): void {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.sfxGain) return;
     const ctx = this.ctx;
 
     const bus = ctx.createGain();
     bus.gain.value = gainLevel;
-    bus.connect(ctx.destination);
+    bus.connect(this.sfxGain);
 
     // Metallic brass tram-gong partial ratios
     const partials: Array<[number, number, number]> = [
@@ -347,17 +405,17 @@ export class HKSoundscape {
    * Brief polite dual-tone Hong Kong minibus / Crown Comfort taxi horn chirp
    * triggered when clicking the green-roof minibus or parked red taxi.
    */
-  public ringVehicleHorn(variant: 'minibus' | 'taxi' = 'taxi'): void {
-    if (this.userExplicitlyMuted) return;
-    if (!this.unlocked) {
-      this.unlockAndStart(false);
+  public ringVehicleHorn(variant: 'minibus' | 'taxi' = 'taxi'): boolean {
+    if (this.userExplicitlyMuted) return false;
+    if (this.muted) {
+      this.setMuted(false);
+    } else {
+      this.ensureContextRunning();
     }
-    if (!this.ctx) return;
-    if (this.ctx.state === 'suspended') {
-      void this.ctx.resume();
-    }
+    if (!this.ctx || !this.sfxGain) return false;
+
     const ctx = this.ctx;
-    const now = ctx.currentTime + 0.01;
+    const now = ctx.currentTime + 0.015;
     const freqs = variant === 'minibus' ? [392, 494] : [440, 554];
     const dur = variant === 'minibus' ? 0.16 : 0.12;
 
@@ -371,7 +429,7 @@ export class HKSoundscape {
     lp.type = 'lowpass';
     lp.frequency.value = 1450;
     bus.connect(lp);
-    lp.connect(ctx.destination);
+    lp.connect(this.sfxGain);
 
     for (const f of freqs) {
       const osc = ctx.createOscillator();
@@ -381,9 +439,13 @@ export class HKSoundscape {
       osc.start(now);
       osc.stop(now + dur + 0.03);
     }
+    return true;
   }
 
   public dispose(): void {
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    }
     if (this.dropletTimer !== null) {
       window.clearInterval(this.dropletTimer);
       this.dropletTimer = null;

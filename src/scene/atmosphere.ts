@@ -164,6 +164,7 @@ export interface AtmospherePresetConfig {
   fillIntensity: number;
   emissiveScale: number;
   shopLightScale: number;
+  exposure: number;
   bloomStrength: number;
   bloomRadius: number;
   bloomThreshold: number;
@@ -191,6 +192,7 @@ export const ATMOSPHERE_PRESETS: Record<PresetName, AtmospherePresetConfig> = {
     fillIntensity: 0.44,
     emissiveScale: 1.08,
     shopLightScale: 0.98,
+    exposure: 1.06,
     bloomStrength: 0.30,
     bloomRadius: 0.54,
     bloomThreshold: 0.88,
@@ -216,6 +218,7 @@ export const ATMOSPHERE_PRESETS: Record<PresetName, AtmospherePresetConfig> = {
     fillIntensity: 0.34,
     emissiveScale: 1.45,
     shopLightScale: 1.40,
+    exposure: 1.06,
     bloomStrength: 0.44,
     bloomRadius: 0.62,
     bloomThreshold: 0.76,
@@ -241,6 +244,7 @@ export const ATMOSPHERE_PRESETS: Record<PresetName, AtmospherePresetConfig> = {
     fillIntensity: 0.46,
     emissiveScale: 0.64,
     shopLightScale: 0.62,
+    exposure: 1.06,
     bloomStrength: 0.21,
     bloomRadius: 0.45,
     bloomThreshold: 0.93,
@@ -485,26 +489,39 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
       }
 
       void main() {
-        float baseFade = smoothstep(0.08, 0.44, vUv.y);
-        float topFade = 1.0 - smoothstep(0.74, 1.0, vUv.y) * 0.88;
+        // Use world-space height & isometric sky-elevation envelope instead of per-face vUv.y
+        // so stepped caps, horizontal roofs, and tall shafts dissolve seamlessly into upper sky
+        // fog on tall portrait viewports without hurting desktop Dusk/Midnight/Dawn skylines.
+        float isWall = 1.0 - abs(vNormalW.y);
+        float wallMask = smoothstep(0.05, 0.35, isWall);
+        float baseFade = smoothstep(1.0, 8.5, vWorldPos.y);
+        float isoY =
+          0.891 * (vWorldPos.y - 4.5) -
+          0.312 * (vWorldPos.x - 0.45) -
+          0.324 * (vWorldPos.z + 1.15);
+        float skyFade = 1.0 - smoothstep(11.5, 19.8, isoY);
+        float worldTopFade = 1.0 - smoothstep(14.5, 23.5, vWorldPos.y);
+        float topFade = skyFade * worldTopFade;
+
         // Fade smoothly along the isometric camera's horizontal screen axis ((x - z) * 0.707)
         float screenX = (vWorldPos.x - vWorldPos.z) * 0.7071;
         float horizFade = 1.0 - smoothstep(7.0, 19.0, abs(screenX - 1.5));
+
+        float fade = baseFade * topFade * horizFade * wallMask;
         // Subtle directional side-plane differentiation so horizon towers have gentle 3D volume
         float sideShade = mix(0.86, 1.06, clamp(dot(vNormalW, normalize(vec3(0.7, 0.4, 0.5))) * 0.5 + 0.5, 0.0, 1.0));
-        vec3 baseCol = mix(uMistColor, uTowerColor * sideShade, uStrength * baseFade * topFade * horizFade);
+        vec3 baseCol = mix(uMistColor, uTowerColor * sideShade, uStrength * fade);
 
-        // Whisper-faint distant high-rise window pinpoints muted near screen edges
-        float isWall = 1.0 - abs(vNormalW.y);
+        // Whisper-faint distant high-rise window pinpoints muted near screen edges & upper sky mist
         vec2 winGrid = vec2(floor(vWorldPos.x * 1.8 + vWorldPos.z * 1.8), floor(vWorldPos.y * 1.45));
         vec2 winCell = fract(vec2(vWorldPos.x * 1.8 + vWorldPos.z * 1.8, vWorldPos.y * 1.45));
         float winMask = step(0.32, winCell.x) * step(winCell.x, 0.68) * step(0.35, winCell.y) * step(winCell.y, 0.66);
         float winRand = hash21(winGrid);
-        float lit = step(0.89, winRand) * winMask * isWall * smoothstep(0.28, 0.54, vUv.y) * (1.0 - smoothstep(0.72, 0.90, vUv.y)) * horizFade;
+        float lit = step(0.89, winRand) * winMask * isWall * smoothstep(3.5, 9.0, vWorldPos.y) * topFade * horizFade;
         vec3 winColor = mix(vec3(0.96, 0.78, 0.50), vec3(0.64, 0.86, 0.98), step(0.95, winRand));
         vec3 finalCol = baseCol + winColor * lit * uWindowGlow * 0.15;
 
-        float alpha = clamp(baseFade * topFade * horizFade * 0.90, 0.0, 1.0);
+        float alpha = clamp(fade * 0.90, 0.0, 1.0);
         if (alpha < 0.01) discard;
         gl_FragColor = vec4(finalCol, alpha);
       }

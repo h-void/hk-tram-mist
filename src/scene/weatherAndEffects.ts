@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { ViewMode } from '../ui/hud';
 import { applyRadialMistFade, type RadialMistUniforms } from './atmosphere';
+import { getHKSignalState } from './hkSignal';
 import { createRippleTexture } from './textures';
 
 interface RainSeed {
@@ -57,6 +58,10 @@ export interface BellPulseOptions {
   colorB?: number;
 }
 
+export interface PrintEdgeSvgOptions {
+  includePaperBg?: boolean;
+}
+
 export interface PrintEdgeSvgResult {
   svg: string;
   stats: {
@@ -75,7 +80,8 @@ export interface WeatherAndEffectsSystem {
     camera: THREE.OrthographicCamera,
     renderer: THREE.WebGLRenderer,
     width: number,
-    height: number
+    height: number,
+    svgOpts?: PrintEdgeSvgOptions
   ) => PrintEdgeSvgResult;
   triggerBellPulse: (origin: THREE.Vector3, simTime: number, pulseOpts?: BellPulseOptions) => void;
   update: (
@@ -671,7 +677,12 @@ export function createWeatherAndEffects(
   // =========================================================================
   const savedMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
   const savedVisibility = new Map<THREE.Object3D, boolean>();
+  const printMaterialTargets: Array<{ mesh: THREE.Mesh; printMat: THREE.Material }> = [];
+  const printDecalTargets: THREE.Object3D[] = [];
+  const allPrintEdges: Array<{ line: THREE.LineSegments; src: THREE.Mesh }> = [];
+  const dynamicPrintEdges: Array<{ line: THREE.LineSegments; src: THREE.Mesh }> = [];
   let printEdgesGroup: THREE.Group | null = null;
+  let printCacheBuilt = false;
   let printModeActive = false;
 
   const xuanPaperMat = new THREE.MeshBasicMaterial({
@@ -748,111 +759,137 @@ export function createWeatherAndEffects(
     return false;
   };
 
-  const buildOrShowPrintMode = (enable: boolean) => {
-    if (enable === printModeActive) return;
-    printModeActive = enable;
+  const buildPrintCacheOnce = () => {
+    if (printCacheBuilt) return;
+    printCacheBuilt = true;
 
     const { buildings, viaductAndVehicles, props, road, tramGroup, taxiGroup } =
       opts.printTargetGroups;
     const allTargets = [buildings, viaductAndVehicles, props, road];
 
+    printEdgesGroup = new THREE.Group();
+    printEdgesGroup.name = 'ArchivalPrintInkLines';
+    printEdgesGroup.visible = false;
+    scene.add(printEdgesGroup);
+
+    for (const root of allTargets) {
+      root.updateMatrixWorld(true);
+      const isDynamicRoot = root === viaductAndVehicles || root === props;
+      root.traverse((obj) => {
+        if (!(obj instanceof THREE.Mesh)) return;
+
+        // Override ExtendedGroundPlane to pure spotless Xuan paper (#F4EFE6) without edges!
+        if (obj.name === 'ExtendedGroundPlane') {
+          printMaterialTargets.push({ mesh: obj, printMat: xuanPaperMat });
+          return;
+        }
+
+        // Skip reflector, shadow decals, puddle glows, and volumetric light cones
+        const singleMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+        const isDecalOrBeam =
+          obj.name === 'PlanarWetRoadReflector' ||
+          singleMat instanceof THREE.ShaderMaterial ||
+          (singleMat instanceof THREE.MeshBasicMaterial && singleMat.transparent);
+
+        if (isDecalOrBeam) {
+          if (obj.name !== 'PlanarWetRoadReflector') {
+            printDecalTargets.push(obj);
+          }
+          return;
+        }
+
+        const isHeroAccent = isInsideAncestor(obj, tramGroup) || isInsideAncestor(obj, taxiGroup);
+        const isRoadOrRail = isInsideAncestor(obj, road);
+        const botanical = obj.userData.printBotanical as 'bauhinia' | 'banyan' | undefined;
+
+        if (obj instanceof THREE.InstancedMesh) {
+          printMaterialTargets.push({ mesh: obj, printMat: xuanWarmTintMat });
+          return;
+        }
+
+        const printMat =
+          botanical === 'bauhinia'
+            ? xuanBauhiniaMat
+            : botanical === 'banyan'
+            ? xuanBanyanMat
+            : isHeroAccent
+            ? xuanCinnabarTintMat
+            : isRoadOrRail
+            ? xuanPaperMat
+            : xuanWarmTintMat;
+        printMaterialTargets.push({ mesh: obj, printMat });
+
+        // Generate crisp 26-degree architectural ink edges ONCE and cache for instant [P] toggles
+        if (
+          obj.geometry &&
+          obj.name !== 'WetAsphaltRoad' &&
+          obj.name !== 'SidewalkOuterDeck' &&
+          !hasSkipPrintEdges(obj)
+        ) {
+          const edgesGeom = new THREE.EdgesGeometry(obj.geometry, 26);
+          if (edgesGeom.attributes.position && edgesGeom.attributes.position.count > 0) {
+            const inkRole = isHeroAccent ? 'cinnabar' : isRoadOrRail ? 'pine' : 'prussian';
+            const lineMat =
+              inkRole === 'cinnabar'
+                ? inkCinnabarMat
+                : inkRole === 'pine'
+                ? inkPineSootMat
+                : inkPrussianMat;
+            const edgeLine = new THREE.LineSegments(edgesGeom, lineMat);
+            edgeLine.matrixAutoUpdate = false;
+            edgeLine.matrix.copy(obj.matrixWorld);
+            edgeLine.userData.sourceMesh = obj;
+            edgeLine.userData.inkRole = inkRole;
+            printEdgesGroup!.add(edgeLine);
+            const entry = { line: edgeLine, src: obj };
+            allPrintEdges.push(entry);
+            if (isDynamicRoot) {
+              dynamicPrintEdges.push(entry);
+            }
+          } else {
+            edgesGeom.dispose();
+          }
+        }
+      });
+    }
+  };
+
+  const syncAllPrintEdgeMatrices = () => {
+    const { buildings, viaductAndVehicles, props, road } = opts.printTargetGroups;
+    buildings.updateMatrixWorld(true);
+    viaductAndVehicles.updateMatrixWorld(true);
+    props.updateMatrixWorld(true);
+    road.updateMatrixWorld(true);
+    for (let i = 0; i < allPrintEdges.length; i++) {
+      const entry = allPrintEdges[i];
+      entry.line.matrix.copy(entry.src.matrixWorld);
+    }
+  };
+
+  const buildOrShowPrintMode = (enable: boolean) => {
+    if (enable === printModeActive) return;
+    printModeActive = enable;
+
     if (enable) {
+      buildPrintCacheOnce();
       savedMaterials.clear();
       savedVisibility.clear();
 
-      if (!printEdgesGroup) {
-        printEdgesGroup = new THREE.Group();
-        printEdgesGroup.name = 'ArchivalPrintInkLines';
-        scene.add(printEdgesGroup);
+      for (let i = 0; i < printMaterialTargets.length; i++) {
+        const { mesh, printMat } = printMaterialTargets[i];
+        savedMaterials.set(mesh, mesh.material);
+        mesh.material = printMat;
       }
-      // Properly dispose old LineSegments geometries before rebuilding (zero GPU memory leak!)
-      while (printEdgesGroup.children.length > 0) {
-        const ch = printEdgesGroup.children[0];
-        if (ch instanceof THREE.LineSegments) {
-          ch.geometry.dispose();
-        }
-        printEdgesGroup.remove(ch);
+      for (let i = 0; i < printDecalTargets.length; i++) {
+        const obj = printDecalTargets[i];
+        savedVisibility.set(obj, obj.visible);
+        obj.visible = false;
       }
 
-      for (const root of allTargets) {
-        root.updateMatrixWorld(true);
-        root.traverse((obj) => {
-          if (!(obj instanceof THREE.Mesh)) return;
-
-          // Override ExtendedGroundPlane to pure spotless Xuan paper (#F4EFE6) without edges!
-          if (obj.name === 'ExtendedGroundPlane') {
-            savedMaterials.set(obj, obj.material);
-            obj.material = xuanPaperMat;
-            return;
-          }
-
-          // Skip reflector, shadow decals, puddle glows, and volumetric light cones
-          const singleMat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
-          const isDecalOrBeam =
-            obj.name === 'PlanarWetRoadReflector' ||
-            singleMat instanceof THREE.ShaderMaterial ||
-            (singleMat instanceof THREE.MeshBasicMaterial && singleMat.transparent);
-
-          if (isDecalOrBeam) {
-            if (obj.name !== 'PlanarWetRoadReflector') {
-              savedVisibility.set(obj, obj.visible);
-              obj.visible = false;
-            }
-            return;
-          }
-
-          savedMaterials.set(obj, obj.material);
-
-          const isHeroAccent = isInsideAncestor(obj, tramGroup) || isInsideAncestor(obj, taxiGroup);
-          const isRoadOrRail = isInsideAncestor(obj, road);
-          const botanical = obj.userData.printBotanical as 'bauhinia' | 'banyan' | undefined;
-
-          if (obj instanceof THREE.InstancedMesh) {
-            obj.material = xuanWarmTintMat;
-            return;
-          }
-
-          obj.material =
-            botanical === 'bauhinia'
-              ? xuanBauhiniaMat
-              : botanical === 'banyan'
-              ? xuanBanyanMat
-              : isHeroAccent
-              ? xuanCinnabarTintMat
-              : isRoadOrRail
-              ? xuanPaperMat
-              : xuanWarmTintMat;
-
-          // Generate crisp architectural ink edges on primary solid meshes
-          // (respect userData.skipPrintEdges on meshes & parent groups so archival engraving stays clean!)
-          if (
-            obj.geometry &&
-            obj.name !== 'WetAsphaltRoad' &&
-            obj.name !== 'SidewalkOuterDeck' &&
-            !hasSkipPrintEdges(obj)
-          ) {
-            const edgesGeom = new THREE.EdgesGeometry(obj.geometry, 26);
-            if (edgesGeom.attributes.position && edgesGeom.attributes.position.count > 0) {
-              const inkRole = isHeroAccent ? 'cinnabar' : isRoadOrRail ? 'pine' : 'prussian';
-              const lineMat =
-                inkRole === 'cinnabar'
-                  ? inkCinnabarMat
-                  : inkRole === 'pine'
-                  ? inkPineSootMat
-                  : inkPrussianMat;
-              const edgeLine = new THREE.LineSegments(edgesGeom, lineMat);
-              edgeLine.matrixAutoUpdate = false;
-              edgeLine.matrix.copy(obj.matrixWorld);
-              edgeLine.userData.sourceMesh = obj;
-              edgeLine.userData.inkRole = inkRole;
-              printEdgesGroup!.add(edgeLine);
-            } else {
-              edgesGeom.dispose();
-            }
-          }
-        });
+      syncAllPrintEdgeMatrices();
+      if (printEdgesGroup) {
+        printEdgesGroup.visible = true;
       }
-      printEdgesGroup.visible = true;
     } else {
       for (const [mesh, origMat] of savedMaterials.entries()) {
         mesh.material = origMat;
@@ -871,26 +908,45 @@ export function createWeatherAndEffects(
   };
 
   /**
-   * Native 3x Orthographic 24-bit Depth-Buffered Hidden-Line-Removed Vector SVG Exporter.
-   * Projects live 26-degree architectural edges into crisp layered <path> ink groups
-   * (Prussian blue, pine soot, cinnabar red) with segmented radial Xuan-paper fade.
+   * Native Orthographic 24-bit Depth-Buffered Hidden-Line-Removed Vector SVG Exporter.
+   * Clamps GPU render target dimensions cleanly (<= 4096 / MAX_RENDERBUFFER_SIZE / MAX_TEXTURE_SIZE),
+   * matches the requested output aspect ratio without distortion, and projects live 26-degree
+   * architectural edges into crisp layered <path> ink groups with radial Xuan-paper fade.
    */
   const getPrintEdgeSVG = (
     camera: THREE.OrthographicCamera,
     renderer: THREE.WebGLRenderer,
     width: number,
-    height: number
+    height: number,
+    svgOpts?: PrintEdgeSvgOptions
   ): PrintEdgeSvgResult => {
+    const includePaperBg = svgOpts?.includePaperBg ?? false;
+    const outW = Math.max(1, Math.round(width));
+    const outH = Math.max(1, Math.round(height));
+
     if (!printEdgesGroup || !printModeActive) {
+      const bgRect = includePaperBg
+        ? `<rect width="${outW}" height="${outH}" fill="#F4EFE6"/>`
+        : '';
       return {
-        svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}"></svg>`,
+        svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${outW} ${outH}" width="${outW}" height="${outH}">${bgRect}</svg>`,
         stats: { totalSegments: 0, visibleSegments: 0, paths: 0 }
       };
     }
 
-    const scale = 3;
-    const rtW = Math.max(64, Math.round(width * scale));
-    const rtH = Math.max(64, Math.round(height * scale));
+    syncAllPrintEdgeMatrices();
+
+    const gl = renderer.getContext();
+    const maxRb = Number(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)) || 4096;
+    const maxTex = Number(gl.getParameter(gl.MAX_TEXTURE_SIZE)) || 4096;
+    const maxDim = Math.min(maxRb, maxTex, 4096);
+    const desiredScale = 3;
+    const effectiveScale = Math.min(desiredScale, maxDim / Math.max(outW, outH));
+    const rtW = Math.max(64, Math.min(maxDim, Math.round(outW * effectiveScale)));
+    const rtH = Math.max(64, Math.min(maxDim, Math.round(outH * effectiveScale)));
+    const scaleX = rtW / outW;
+    const scaleY = rtH / outH;
+
     const rt = new THREE.WebGLRenderTarget(rtW, rtH, {
       minFilter: THREE.NearestFilter,
       magFilter: THREE.NearestFilter,
@@ -933,33 +989,71 @@ export function createWeatherAndEffects(
     renderer.getClearColor(prevClearCol);
     const prevClearAlpha = renderer.getClearAlpha();
 
-    // Hide lines & weather sprites; render exact solid occluder depth map
-    printEdgesGroup.visible = false;
-    group.visible = false;
-    scene.overrideMaterial = depthMat;
-    camera.updateMatrixWorld(true);
-    scene.updateMatrixWorld(true);
-
-    renderer.setRenderTarget(rt);
-    renderer.setClearColor(0xffffff, 1);
-    renderer.clear(true, true, false);
-    renderer.render(scene, camera);
+    // Save camera frustum so we can match requested outW/outH aspect cleanly without stretching
+    const prevLeft = camera.left;
+    const prevRight = camera.right;
+    const prevTop = camera.top;
+    const prevBottom = camera.bottom;
+    const prevSpanX = prevRight - prevLeft;
+    const prevSpanY = prevTop - prevBottom;
+    const centerX = (prevLeft + prevRight) * 0.5;
+    const centerY = (prevTop + prevBottom) * 0.5;
+    const curAspect = prevSpanX / Math.max(1e-5, prevSpanY);
+    const outAspect = outW / outH;
+    let frustumAdjusted = false;
 
     const pixels = new Uint8Array(rtW * rtH * 4);
-    renderer.readRenderTargetPixels(rt, 0, 0, rtW, rtH, pixels);
+    const mvp = new THREE.Matrix4();
 
-    // Restore renderer & scene cleanly
-    renderer.setRenderTarget(prevRT);
-    renderer.setClearColor(prevClearCol, prevClearAlpha);
-    scene.overrideMaterial = prevOverride;
-    printEdgesGroup.visible = prevEdgesVis;
-    group.visible = prevWeatherVis;
-    rt.dispose();
-    depthMat.dispose();
+    try {
+      if (Math.abs(outAspect - curAspect) > 1e-4) {
+        let targetSpanY = prevSpanY;
+        if (curAspect < 1.0 && outAspect >= 1.0) {
+          targetSpanY = Math.min(prevSpanY, Math.max(32.8, prevSpanX / outAspect));
+        }
+        const targetSpanX = targetSpanY * outAspect;
+        camera.left = centerX - targetSpanX * 0.5;
+        camera.right = centerX + targetSpanX * 0.5;
+        camera.top = centerY + targetSpanY * 0.5;
+        camera.bottom = centerY - targetSpanY * 0.5;
+        camera.updateProjectionMatrix();
+        frustumAdjusted = true;
+      }
+
+      // Hide lines & weather sprites; render exact solid occluder depth map
+      printEdgesGroup.visible = false;
+      group.visible = false;
+      scene.overrideMaterial = depthMat;
+      camera.updateMatrixWorld(true);
+      scene.updateMatrixWorld(true);
+
+      renderer.setRenderTarget(rt);
+      renderer.setClearColor(0xffffff, 1);
+      renderer.clear(true, true, false);
+      renderer.render(scene, camera);
+
+      renderer.readRenderTargetPixels(rt, 0, 0, rtW, rtH, pixels);
+      mvp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    } finally {
+      if (frustumAdjusted) {
+        camera.left = prevLeft;
+        camera.right = prevRight;
+        camera.top = prevTop;
+        camera.bottom = prevBottom;
+        camera.updateProjectionMatrix();
+      }
+      renderer.setRenderTarget(prevRT);
+      renderer.setClearColor(prevClearCol, prevClearAlpha);
+      scene.overrideMaterial = prevOverride;
+      printEdgesGroup.visible = prevEdgesVis;
+      group.visible = prevWeatherVis;
+      rt.dispose();
+      depthMat.dispose();
+    }
 
     const sampleMaxDepth = (sx: number, sy: number): number => {
-      const cx = Math.min(rtW - 1, Math.max(0, Math.round(sx * scale)));
-      const cy = Math.min(rtH - 1, Math.max(0, Math.round((height - sy) * scale)));
+      const cx = Math.min(rtW - 1, Math.max(0, Math.round(sx * scaleX)));
+      const cy = Math.min(rtH - 1, Math.max(0, Math.round((outH - sy) * scaleY)));
       let maxD = 0;
       for (let dy = -1; dy <= 1; dy++) {
         const py = Math.min(rtH - 1, Math.max(0, cy + dy));
@@ -996,7 +1090,6 @@ export function createWeatherAndEffects(
     const nA = new THREE.Vector3();
     const nB = new THREE.Vector3();
     const nM = new THREE.Vector3();
-    const mvp = new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     const DEPTH_BIAS = 0.00145;
 
     let totalSegments = 0;
@@ -1029,15 +1122,15 @@ export function createWeatherAndEffects(
           nB.copy(pB).applyMatrix4(mvp);
           nM.copy(pM).applyMatrix4(mvp);
 
-          const x0 = (nA.x * 0.5 + 0.5) * width;
-          const y0 = (0.5 - nA.y * 0.5) * height;
-          const x1 = (nB.x * 0.5 + 0.5) * width;
-          const y1 = (0.5 - nB.y * 0.5) * height;
+          const x0 = (nA.x * 0.5 + 0.5) * outW;
+          const y0 = (0.5 - nA.y * 0.5) * outH;
+          const x1 = (nB.x * 0.5 + 0.5) * outW;
+          const y1 = (0.5 - nB.y * 0.5) * outH;
           if (
             (x0 < -2 && x1 < -2) ||
-            (x0 > width + 2 && x1 > width + 2) ||
+            (x0 > outW + 2 && x1 > outW + 2) ||
             (y0 < -2 && y1 < -2) ||
-            (y0 > height + 2 && y1 > height + 2)
+            (y0 > outH + 2 && y1 > outH + 2)
           ) {
             continue;
           }
@@ -1083,8 +1176,13 @@ export function createWeatherAndEffects(
       return `<path d="${b.segs.join('')}" fill="none" stroke="${b.stroke}" stroke-opacity="${b.opacity}" stroke-width="${b.width}" stroke-linecap="round"/>`;
     });
 
+    const bgRect = includePaperBg
+      ? `<rect width="${outW}" height="${outH}" fill="#F4EFE6"/>`
+      : '';
+    const aspectAttr = includePaperBg ? '' : ' preserveAspectRatio="none"';
+
     return {
-      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="none">${pathTags.join('')}</svg>`,
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${outW} ${outH}" width="${outW}" height="${outH}"${aspectAttr}>${bgRect}${pathTags.join('')}</svg>`,
       stats: { totalSegments, visibleSegments, paths: pathTags.length }
     };
   };
@@ -1245,8 +1343,7 @@ export function createWeatherAndEffects(
 
     // 4. Update [A] Acoustic Field custom GLSL multi-harmonic wavefronts
     if (currentViewMode === 'acoustic') {
-      const sigClock = simTime + 2.1;
-      const sigT = ((sigClock % 14.0) + 14.0) % 14.0;
+      const sig = getHKSignalState(simTime);
 
       for (const nw of neonWaveRings) {
         const u = (((simTime * 0.68 + nw.phase) % 1.0) + 1.0) % 1.0;
@@ -1280,9 +1377,9 @@ export function createWeatherAndEffects(
         mw.mat.uniforms.uOpacity.value = (1 - u) * 0.52;
       }
 
-      // Hong Kong pedestrian audible crossing signal emerald wavefronts synced to 14s HK clock!
-      const crossingActive = sigT < 8.5;
-      const crossingRate = sigT >= 6.0 ? 2.8 : 1.15;
+      // Hong Kong pedestrian audible crossing signal emerald wavefronts synced to authentic 14s HK clock!
+      const crossingActive = sig.crossingAudioActive;
+      const crossingRate = sig.crossingAudioUrgent ? 2.8 : 1.15;
       for (const cw of crossingBeepRings) {
         if (!crossingActive) {
           cw.mesh.visible = false;
@@ -1347,11 +1444,9 @@ export function createWeatherAndEffects(
     if (printModeActive && printEdgesGroup) {
       opts.printTargetGroups.viaductAndVehicles.updateMatrixWorld(true);
       opts.printTargetGroups.props.updateMatrixWorld(true);
-      for (const ch of printEdgesGroup.children) {
-        const src = ch.userData.sourceMesh as THREE.Mesh | undefined;
-        if (src) {
-          ch.matrix.copy(src.matrixWorld);
-        }
+      for (let i = 0; i < dynamicPrintEdges.length; i++) {
+        const entry = dynamicPrintEdges[i];
+        entry.line.matrix.copy(entry.src.matrixWorld);
       }
     }
   };

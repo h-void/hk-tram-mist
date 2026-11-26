@@ -6,7 +6,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
-import { HKSoundscape } from './audio/hkSoundscape';
+import { HKSoundscape, type SoundState } from './audio/hkSoundscape';
 import {
   DioramaHud,
   type CameraView,
@@ -15,11 +15,16 @@ import {
   type ViewMode
 } from './ui/hud';
 import { ATMOSPHERE_PRESETS, createAtmosphere } from './scene/atmosphere';
+import { getHKSignalState } from './scene/hkSignal';
 import { createRoadAndReflections } from './scene/roadAndReflections';
 import { createBuildings } from './scene/buildings';
 import { createViaductAndVehicles } from './scene/viaductAndVehicles';
 import { createPropsAndLife } from './scene/propsAndLife';
-import { createWeatherAndEffects, type PrintEdgeSvgResult } from './scene/weatherAndEffects';
+import {
+  createWeatherAndEffects,
+  type PrintEdgeSvgOptions,
+  type PrintEdgeSvgResult
+} from './scene/weatherAndEffects';
 
 interface SceneControllerAPI {
   setPreset: (preset: PresetName) => void;
@@ -31,7 +36,11 @@ interface SceneControllerAPI {
   ) => void;
   setMode: (mode: ViewMode) => void;
   setPrintEdgesVisible: (visible: boolean) => void;
-  getPrintEdgeSVG: (width: number, height: number) => PrintEdgeSvgResult;
+  getPrintEdgeSVG: (
+    width: number,
+    height: number,
+    opts?: PrintEdgeSvgOptions
+  ) => PrintEdgeSvgResult;
   setLang: (lang: LangCode) => void;
   setSimTime: (t: number) => void;
   resumeAuto: () => void;
@@ -47,6 +56,7 @@ interface SceneControllerAPI {
     preset: PresetName;
     mode: ViewMode;
     cameraView: CameraView;
+    soundState: SoundState;
     fps: number;
     simTime: number;
     ready: boolean;
@@ -87,13 +97,37 @@ function parseUrlConfig(): UrlBootConfig {
   return { lang, preset, view, mode, hudVisible, lockedTime };
 }
 
+function showWebGLFallback(): void {
+  let veil = document.getElementById('boot-veil');
+  if (!veil) {
+    veil = document.createElement('div');
+    veil.id = 'boot-veil';
+    veil.setAttribute('aria-live', 'polite');
+    document.body.appendChild(veil);
+  }
+  veil.classList.remove('boot-done');
+  veil.innerHTML = `
+    <div class="boot-card boot-fallback" role="alert">
+      <div class="boot-title">TRAMLINE MIST <span>香江雨霧・叮叮</span></div>
+      <img class="boot-fallback-img" src="./og.jpg" alt="TRAMLINE MIST — Procedural 3D Hong Kong rainy corner diorama preview" />
+      <p class="boot-fallback-copy">WebGL2 graphics acceleration is required to render the live procedural 3D diorama. Enable hardware acceleration or try a WebGL2-capable browser.</p>
+      <p class="boot-fallback-zh">此作品需要支援 WebGL2 硬體加速的瀏覽器以即時合成 3D 香港雨霧場景，請啟用硬體加速或重新載入頁面。</p>
+      <button type="button" class="boot-reload-btn" id="btn-webgl-reload">Reload / 重新載入</button>
+    </div>
+  `;
+  const btn = document.getElementById('btn-webgl-reload');
+  if (btn) {
+    btn.addEventListener('click', () => window.location.reload());
+  }
+}
+
 declare global {
   interface Window {
     __SCENE_CTRL__?: SceneControllerAPI;
   }
 }
 
-function boot(): void {
+function bootScene(): void {
   const container = document.getElementById('app');
   if (!container) return;
 
@@ -102,13 +136,27 @@ function boot(): void {
     antialias: true,
     powerPreference: 'high-performance'
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  if (!renderer.capabilities.isWebGL2) {
+    renderer.dispose();
+    throw new Error('WebGL2 context is required');
+  }
+  const initialDpr = Math.min(window.devicePixelRatio || 1, 2);
+  renderer.setPixelRatio(initialDpr);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.06;
+  renderer.toneMappingExposure = ATMOSPHERE_PRESETS.dusk.exposure;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.info.autoReset = false;
   container.appendChild(renderer.domElement);
+
+  const gl = renderer.getContext();
+  const supportsHalfFloatRT = Boolean(
+    gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float')
+  );
+  const renderTargetType: THREE.TextureDataType = supportsHalfFloatRT
+    ? THREE.HalfFloatType
+    : THREE.UnsignedByteType;
 
   // 2. Scene & Orthographic Isometric Camera
   const scene = new THREE.Scene();
@@ -135,6 +183,15 @@ function boot(): void {
   camera.zoom = 0.885;
   camera.updateProjectionMatrix();
 
+  // Capture accurate pre-postprocess scene draw calls (instead of OutputPass fullscreen quad = 1)
+  let lastSceneDrawCalls = 0;
+  let isComposerRendering = false;
+  scene.onAfterRender = (_r, _s, cam) => {
+    if (isComposerRendering && cam === camera) {
+      lastSceneDrawCalls = renderer.info.render.calls;
+    }
+  };
+
   // 3. Smooth Damped OrbitControls with Tasteful Bounds
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(0.45, 4.5, -1.15);
@@ -150,16 +207,37 @@ function boot(): void {
   controls.update();
 
   // 4. Post-Processing Pipeline (RenderPass -> Restrained UnrealBloomPass -> OutputPass)
-  const composer = new EffectComposer(renderer);
+  const composerTarget = new THREE.WebGLRenderTarget(
+    Math.max(1, window.innerWidth),
+    Math.max(1, window.innerHeight),
+    { type: renderTargetType }
+  );
+  composerTarget.texture.name = 'EffectComposer.rt1';
+  const composer = new EffectComposer(renderer, composerTarget);
+  composer.setPixelRatio(initialDpr);
+  composer.setSize(window.innerWidth, window.innerHeight);
+
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
 
   const bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    new THREE.Vector2(
+      Math.max(1, Math.round(window.innerWidth * initialDpr)),
+      Math.max(1, Math.round(window.innerHeight * initialDpr))
+    ),
     ATMOSPHERE_PRESETS.dusk.bloomStrength,
     ATMOSPHERE_PRESETS.dusk.bloomRadius,
     ATMOSPHERE_PRESETS.dusk.bloomThreshold
   );
+  if (!supportsHalfFloatRT) {
+    bloomPass.renderTargetBright.texture.type = THREE.UnsignedByteType;
+    for (const rt of bloomPass.renderTargetsHorizontal) {
+      rt.texture.type = THREE.UnsignedByteType;
+    }
+    for (const rt of bloomPass.renderTargetsVertical) {
+      rt.texture.type = THREE.UnsignedByteType;
+    }
+  }
   composer.addPass(bloomPass);
 
   const outputPass = new OutputPass();
@@ -167,7 +245,11 @@ function boot(): void {
 
   // 5. Build All Procedural Diorama Subsystems
   const atmosphere = createAtmosphere(scene);
-  const roadAndReflections = createRoadAndReflections(scene, atmosphere.mistUniforms);
+  const roadAndReflections = createRoadAndReflections(
+    scene,
+    atmosphere.mistUniforms,
+    renderTargetType
+  );
   const buildings = createBuildings(scene);
   const viaductAndVehicles = createViaductAndVehicles(scene, atmosphere.mistUniforms);
   const propsAndLife = createPropsAndLife(scene);
@@ -197,9 +279,15 @@ function boot(): void {
   let needsLockedRender = false;
   let isTransitioningCam = false;
   let followTram = false;
+  let contextLost = false;
+  let rafId: number | null = null;
   const desiredCamPos = camera.position.clone();
   const desiredTarget = controls.target.clone();
   let desiredZoom = camera.zoom;
+
+  const syncSoundHud = () => {
+    hud.setState({ soundState: soundscape.getSoundState() });
+  };
 
   const getCameraPose = (
     view: CameraView
@@ -237,9 +325,12 @@ function boot(): void {
     weatherAndEffects.setRainOpacity(cfg.rainOpacity);
 
     if (currentViewMode !== 'print') {
+      bloomPass.enabled = true;
       bloomPass.strength = cfg.bloomStrength;
       bloomPass.radius = cfg.bloomRadius;
       bloomPass.threshold = cfg.bloomThreshold;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = cfg.exposure;
     }
     hud.setState({ preset });
   };
@@ -255,17 +346,21 @@ function boot(): void {
     weatherAndEffects.setViewMode(mode);
 
     if (isPrint) {
+      bloomPass.enabled = false;
       bloomPass.strength = 0.0;
+      renderer.toneMapping = THREE.NoToneMapping;
       renderer.toneMappingExposure = 1.0;
     } else {
       const cfg = ATMOSPHERE_PRESETS[currentPreset];
       buildings.setEmissiveScale(cfg.emissiveScale);
       viaductAndVehicles.setEmissiveScale(cfg.emissiveScale);
       propsAndLife.setEmissiveScale(cfg.emissiveScale);
+      bloomPass.enabled = true;
       bloomPass.strength = cfg.bloomStrength;
       bloomPass.radius = cfg.bloomRadius;
       bloomPass.threshold = cfg.bloomThreshold;
-      renderer.toneMappingExposure = 1.06;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = cfg.exposure;
     }
     hud.setState({ mode });
   };
@@ -295,7 +390,25 @@ function boot(): void {
 
   const triggerTramBell = () => {
     soundscape.ringTramBell();
+    syncSoundHud();
     weatherAndEffects.triggerBellPulse(viaductAndVehicles.getTramPosition(), simTime);
+  };
+
+  const exportPrintSvg = () => {
+    if (currentViewMode !== 'print' || contextLost) return;
+    flushCtrlRender();
+    const res = weatherAndEffects.getPrintEdgeSVG(camera, renderer, 1440, 1080, {
+      includePaperBg: true
+    });
+    const blob = new Blob([res.svg], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'tramline-mist-engraving.svg';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const urlCfg = parseUrlConfig();
@@ -314,20 +427,34 @@ function boot(): void {
         applyViewModeState(m);
         renderFrame();
       },
+      onExportSvg: () => {
+        exportPrintSvg();
+      },
       onBell: () => {
         triggerTramBell();
       },
-      onToggleSound: () => soundscape.toggleMute()
+      onToggleSound: () => {
+        soundscape.toggleMute();
+        return soundscape.getSoundState();
+      }
     },
     urlCfg.lang
   );
 
   let isRenderingFrame = false;
+  let isOrbiting = false;
 
   // Cancel preset camera lerp when user manually drags or zooms
   controls.addEventListener('start', () => {
+    isOrbiting = true;
+    hoverDirty = false;
+    renderer.domElement.classList.remove('pointer-hover');
     isTransitioningCam = false;
     followTram = false;
+  });
+
+  controls.addEventListener('end', () => {
+    isOrbiting = false;
   });
 
   controls.addEventListener('change', () => {
@@ -336,16 +463,20 @@ function boot(): void {
     }
   });
 
-  // 7. Pointer Raycasting for Clicking & Hovering Hero Vehicles (Tram #120, Green-Roof Minibus #28, Red Taxi)
+  // 7. Pointer Raycasting for Clicking & Frame-Throttled Hovering on Hero Vehicles
   const raycaster = new THREE.Raycaster();
   const pointerNDC = new THREE.Vector2();
   let pointerDownPos = { x: 0, y: 0 };
+  let hoverDirty = false;
+  let hoverClientX = 0;
+  let hoverClientY = 0;
 
   const getInteractiveVehicleAtPointer = (
     clientX: number,
     clientY: number
   ): 'tram' | 'minibus' | 'taxi' | null => {
     const rect = renderer.domElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
     pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointerNDC, camera);
@@ -370,8 +501,15 @@ function boot(): void {
   });
 
   renderer.domElement.addEventListener('pointermove', (e) => {
-    const vehicle = getInteractiveVehicleAtPointer(e.clientX, e.clientY);
-    renderer.domElement.classList.toggle('pointer-hover', vehicle !== null);
+    if (isOrbiting) return;
+    hoverClientX = e.clientX;
+    hoverClientY = e.clientY;
+    hoverDirty = true;
+  });
+
+  renderer.domElement.addEventListener('pointerleave', () => {
+    hoverDirty = false;
+    renderer.domElement.classList.remove('pointer-hover');
   });
 
   renderer.domElement.addEventListener('pointerup', (e) => {
@@ -382,6 +520,7 @@ function boot(): void {
         triggerTramBell();
       } else if (vehicle === 'minibus') {
         soundscape.ringVehicleHorn('minibus');
+        syncSoundHud();
         const p = viaductAndVehicles.minibusGroup.position;
         weatherAndEffects.triggerBellPulse(new THREE.Vector3(p.x, 1.4, p.z), simTime, {
           followTram: false,
@@ -390,6 +529,7 @@ function boot(): void {
         });
       } else if (vehicle === 'taxi') {
         soundscape.ringVehicleHorn('taxi');
+        syncSoundHud();
         const p = viaductAndVehicles.taxiGroup.position;
         weatherAndEffects.triggerBellPulse(new THREE.Vector3(p.x, 0.8, p.z), simTime, {
           followTram: false,
@@ -400,18 +540,33 @@ function boot(): void {
     }
   });
 
-  // 8. Keyboard Shortcuts (1/2/3, Q/W/E, A, P, Space, M)
+  // 8. Keyboard Shortcuts (1/2/3, Q/W/E, A, P, Space, M) with repeat & editable-target guards
   window.addEventListener('keydown', (e) => {
+    if (e.repeat) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const target = e.target as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable)
+    ) {
+      return;
+    }
+
     switch (e.code) {
       case 'Digit1':
         applyPresetState('dusk');
+        if (manualTimeLock) needsLockedRender = true;
         break;
       case 'Digit2':
         applyPresetState('midnight');
+        if (manualTimeLock) needsLockedRender = true;
         break;
       case 'Digit3':
         applyPresetState('dawn');
+        if (manualTimeLock) needsLockedRender = true;
         break;
       case 'KeyQ':
         applyCameraView('iso', false);
@@ -424,17 +579,19 @@ function boot(): void {
         break;
       case 'KeyA':
         applyViewModeState(currentViewMode === 'acoustic' ? 'diorama' : 'acoustic');
+        if (manualTimeLock) needsLockedRender = true;
         break;
       case 'KeyP':
         applyViewModeState(currentViewMode === 'print' ? 'diorama' : 'print');
+        if (manualTimeLock) needsLockedRender = true;
         break;
       case 'Space':
         e.preventDefault();
         triggerTramBell();
         break;
       case 'KeyM': {
-        const enabled = soundscape.toggleMute();
-        hud.setState({ soundEnabled: enabled });
+        soundscape.toggleMute();
+        syncSoundHud();
         break;
       }
       default:
@@ -442,7 +599,7 @@ function boot(): void {
     }
   });
 
-  // 9. Responsive Resize Handler
+  // 9. Responsive Resize & DPR Handler
   const handleResize = () => {
     const w = window.innerWidth;
     const h = Math.max(1, window.innerHeight);
@@ -454,14 +611,67 @@ function boot(): void {
     camera.bottom = -fSize / 2;
     camera.updateProjectionMatrix();
 
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    renderer.setPixelRatio(dpr);
+    composer.setPixelRatio(dpr);
     renderer.setSize(w, h);
     composer.setSize(w, h);
-    bloomPass.setSize(w, h);
     if (manualTimeLock) {
       needsLockedRender = true;
     }
   };
   window.addEventListener('resize', handleResize);
+
+  // 9B. WebGL Context Loss & Restore Recovery
+  let contextLostOverlay: HTMLDivElement | null = null;
+  const showContextLostOverlay = () => {
+    if (!contextLostOverlay) {
+      contextLostOverlay = document.createElement('div');
+      contextLostOverlay.id = 'context-lost-veil';
+      contextLostOverlay.innerHTML = `
+        <div class="boot-card boot-fallback" role="alert">
+          <div class="boot-title">TRAMLINE MIST <span>香江雨霧・叮叮</span></div>
+          <p class="boot-fallback-copy">WebGL graphics context was lost. Attempting automatic restore…</p>
+          <p class="boot-fallback-zh">WebGL 繪圖內容已中斷，正在嘗試自動恢復，或可按下方按鈕重新載入。</p>
+          <button type="button" class="boot-reload-btn" id="btn-context-reload">Reload / 重新載入</button>
+        </div>
+      `;
+      document.body.appendChild(contextLostOverlay);
+      const reloadBtn = contextLostOverlay.querySelector('#btn-context-reload');
+      reloadBtn?.addEventListener('click', () => window.location.reload());
+    }
+  };
+
+  const hideContextLostOverlay = () => {
+    if (contextLostOverlay) {
+      contextLostOverlay.remove();
+      contextLostOverlay = null;
+    }
+  };
+
+  renderer.domElement.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    contextLost = true;
+    if (rafId !== null) {
+      window.cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+    showContextLostOverlay();
+  });
+
+  renderer.domElement.addEventListener('webglcontextrestored', () => {
+    contextLost = false;
+    hideContextLostOverlay();
+    handleResize();
+    applyPresetState(currentPreset);
+    applyViewModeState(currentViewMode);
+    updateSimulation(simTime);
+    renderFrame();
+    lastNow = performance.now();
+    if (rafId === null) {
+      rafId = requestAnimationFrame(animate);
+    }
+  });
 
   // 10. Core Simulation Step & Render Function
   const updateSimulation = (t: number) => {
@@ -483,8 +693,7 @@ function boot(): void {
       rainAudio
     );
     if (!manualTimeLock) {
-      const sigT = (((t + 2.1) % 14.0) + 14.0) % 14.0;
-      soundscape.updateTrafficSignal(sigT);
+      soundscape.updateTrafficSignal(getHKSignalState(t));
     }
   };
 
@@ -495,11 +704,15 @@ function boot(): void {
   };
 
   const renderFrame = () => {
+    if (contextLost) return;
     isRenderingFrame = true;
     clampPanTarget();
     controls.update();
     isRenderingFrame = false;
+    renderer.info.reset();
+    isComposerRendering = true;
     composer.render();
+    isComposerRendering = false;
   };
 
   // Apply initial URL state cleanly before first frame
@@ -528,7 +741,9 @@ function boot(): void {
       sceneMeshCount += 1;
       const geom = obj.geometry;
       if (geom) {
-        const count = geom.index ? geom.index.count / 3 : (geom.attributes.position?.count ?? 0) / 3;
+        const count = geom.index
+          ? geom.index.count / 3
+          : (geom.attributes.position?.count ?? 0) / 3;
         const mult = obj instanceof THREE.InstancedMesh ? obj.count : 1;
         sceneTriangleCount += Math.round(count * mult);
       }
@@ -543,15 +758,26 @@ function boot(): void {
   }
   hud.bumpActivity();
 
-  // 11. Main Animation Loop with FPS Tracking & Idle-Skip During Deterministic Lock
+  // 11. Main Animation Loop with FPS Tracking, Throttled Hover Raycast & Idle-Skip During Deterministic Lock
   let lastNow = performance.now();
   let fpsSmoothed = 60;
 
   const animate = (now: number) => {
-    requestAnimationFrame(animate);
+    if (contextLost) {
+      rafId = null;
+      return;
+    }
+    rafId = requestAnimationFrame(animate);
     const dt = Math.min(0.05, Math.max(0.0001, (now - lastNow) / 1000));
     lastNow = now;
     fpsSmoothed = fpsSmoothed * 0.92 + (1 / dt) * 0.08;
+
+    // Throttled at most once per animation frame, skipped while orbiting
+    if (hoverDirty && !isOrbiting) {
+      hoverDirty = false;
+      const vehicle = getInteractiveVehicleAtPointer(hoverClientX, hoverClientY);
+      renderer.domElement.classList.toggle('pointer-hover', vehicle !== null);
+    }
 
     // When locked via __SCENE_CTRL__.setSimTime(), skip redundant WebGL redraws unless user/controller requests one
     if (manualTimeLock) {
@@ -597,10 +823,9 @@ function boot(): void {
 
     renderFrame();
   };
-  requestAnimationFrame(animate);
+  rafId = requestAnimationFrame(animate);
 
   // 12. Expose Deterministic Inspection & Automation Controller Hook
-  const gl = renderer.getContext();
   let ctrlRenderPending = false;
   const flushCtrlRender = () => {
     if (ctrlRenderPending || needsLockedRender) {
@@ -648,9 +873,9 @@ function boot(): void {
       weatherAndEffects.setPrintEdgesVisible(visible);
       scheduleCtrlRender();
     },
-    getPrintEdgeSVG: (width, height) => {
+    getPrintEdgeSVG: (width, height, opts) => {
       flushCtrlRender();
-      return weatherAndEffects.getPrintEdgeSVG(camera, renderer, width, height);
+      return weatherAndEffects.getPrintEdgeSVG(camera, renderer, width, height, opts);
     },
     setLang: (lang) => {
       hud.setLang(lang);
@@ -696,19 +921,29 @@ function boot(): void {
       flushCtrlRender();
       return {
         glError: gl.getError(),
-        drawCalls: renderer.info.render.calls,
+        drawCalls: lastSceneDrawCalls,
         triangles: sceneTriangleCount,
         meshCount: sceneMeshCount,
         lang: hud.getLang(),
         preset: currentPreset,
         mode: currentViewMode,
         cameraView: currentCameraView,
+        soundState: soundscape.getSoundState(),
         fps: Math.round(fpsSmoothed),
         simTime,
         ready: true
       };
     }
   };
+}
+
+function boot(): void {
+  try {
+    bootScene();
+  } catch (err) {
+    console.error('TRAMLINE MIST failed to initialize WebGL2:', err);
+    showWebGLFallback();
+  }
 }
 
 // Defer heavy procedural texture + WebGL shader synthesis by 2 frames so #boot-veil paints immediately

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { applyRadialMistFade, type RadialMistUniforms } from './atmosphere';
+import { getHKSignalState } from './hkSignal';
 import {
   createGlowSpriteTexture,
   createManholeTexture,
@@ -161,11 +162,12 @@ class PlanarWetReflector extends THREE.Mesh {
     height: number,
     mirrorY: number,
     mistUniforms: RadialMistUniforms,
-    hiddenDuringReflection: THREE.Object3D[]
+    hiddenDuringReflection: THREE.Object3D[],
+    renderTargetType: THREE.TextureDataType = THREE.HalfFloatType
   ) {
     const geom = new THREE.PlaneGeometry(width, height);
     const renderTarget = new THREE.WebGLRenderTarget(768, 768, {
-      type: THREE.HalfFloatType,
+      type: renderTargetType,
       samples: 0,
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter
@@ -405,7 +407,8 @@ export interface RoadAndReflectionsSystem {
 
 export function createRoadAndReflections(
   scene: THREE.Scene,
-  mistUniforms: RadialMistUniforms
+  mistUniforms: RadialMistUniforms,
+  renderTargetType: THREE.TextureDataType = THREE.HalfFloatType
 ): RoadAndReflectionsSystem {
   const group = new THREE.Group();
   group.name = 'RoadAndReflectionsGroup';
@@ -669,7 +672,14 @@ export function createRoadAndReflections(
   hiddenDuringReflection.push(glowGroup);
 
   // 5. Orthographic-compatible Planar Wet Reflector (width 10.4, length 42.0, y = 0.003)
-  const reflector = new PlanarWetReflector(10.4, 42.0, 0.003, mistUniforms, hiddenDuringReflection);
+  const reflector = new PlanarWetReflector(
+    10.4,
+    42.0,
+    0.003,
+    mistUniforms,
+    hiddenDuringReflection,
+    renderTargetType
+  );
   reflector.name = 'PlanarWetRoadReflector';
   group.add(reflector);
 
@@ -955,18 +965,24 @@ export function createRoadAndReflections(
     },
     update: (simTime) => {
       reflector.setTime(simTime);
-      const sigClock = simTime + 2.1;
-      const sigT = ((sigClock % 14.0) + 14.0) % 14.0;
+      const sig = getHKSignalState(simTime);
       const targetCol =
-        sigT < 6.0
+        sig.vehicle === 'RED'
           ? sigColRed
-          : sigT < 8.5
+          : sig.vehicle === 'RED_AMBER'
           ? sigColRedAmber
-          : sigT < 12.5
+          : sig.vehicle === 'GREEN'
           ? sigColGreen
           : sigColAmber;
       const pulse = 0.92 + 0.08 * Math.sin(simTime * 3.4);
-      const baseOp = sigT < 6.0 ? 0.21 : sigT < 8.5 ? 0.24 : sigT < 12.5 ? 0.19 : 0.21;
+      const baseOp =
+        sig.vehicle === 'RED'
+          ? 0.21
+          : sig.vehicle === 'RED_AMBER'
+          ? 0.24
+          : sig.vehicle === 'GREEN'
+          ? 0.19
+          : 0.21;
       for (const sm of signalPuddleMats) {
         sm.color.copy(targetCol);
         sm.opacity = baseOp * currentGlowScale * pulse;

@@ -1,3 +1,5 @@
+import type { SoundState } from '../audio/hkSoundscape';
+
 export type PresetName = 'dusk' | 'midnight' | 'dawn';
 export type CameraView = 'iso' | 'tram' | 'street';
 export type ViewMode = 'diorama' | 'acoustic' | 'print';
@@ -7,8 +9,9 @@ export interface HudCallbacks {
   onPreset: (preset: PresetName) => void;
   onCamera: (view: CameraView) => void;
   onMode: (mode: ViewMode) => void;
+  onExportSvg: () => void;
   onBell: () => void;
-  onToggleSound: () => boolean;
+  onToggleSound: () => SoundState;
 }
 
 const LABELS = {
@@ -24,8 +27,10 @@ const LABELS = {
     street: '街角',
     acoustic: '聲場',
     print: '版畫',
+    exportSvg: '匯出 SVG',
     bell: '鳴鈴',
-    soundOn: '雨聲開',
+    soundIdle: '聲音',
+    soundOn: '聲音開',
     soundOff: '靜音',
     lang: 'EN',
     github: 'GitHub 源碼 ↗︎',
@@ -43,8 +48,10 @@ const LABELS = {
     street: 'Street',
     acoustic: 'Acoustic',
     print: 'Print',
+    exportSvg: 'SVG',
     bell: 'Bell',
-    soundOn: 'Sound',
+    soundIdle: 'Sound',
+    soundOn: 'Sound On',
     soundOff: 'Muted',
     lang: '繁中',
     github: 'GitHub Source ↗︎',
@@ -62,6 +69,7 @@ export class DioramaHud {
   private cameraBtns = new Map<CameraView, HTMLButtonElement>();
   private acousticBtn!: HTMLButtonElement;
   private printBtn!: HTMLButtonElement;
+  private svgExportBtn!: HTMLButtonElement;
   private bellBtn!: HTMLButtonElement;
   private soundBtn!: HTMLButtonElement;
   private langBtn!: HTMLButtonElement;
@@ -70,7 +78,7 @@ export class DioramaHud {
   private currentPreset: PresetName = 'dusk';
   private currentCamera: CameraView = 'iso';
   private currentMode: ViewMode = 'diorama';
-  private soundEnabled = false;
+  private soundState: SoundState = 'idle';
   private idleTimer: number | null = null;
 
   constructor(
@@ -89,9 +97,20 @@ export class DioramaHud {
     this.setupIdleFade();
   }
 
+  private syncLangToUrl(): void {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('lang', this.lang);
+      window.history.replaceState(null, '', url.toString());
+    } catch {
+      // Ignore history API restrictions on opaque origins
+    }
+  }
+
   public setLang(lang: LangCode): void {
     this.lang = lang;
     this.renderText();
+    this.syncLangToUrl();
   }
 
   public getLang(): LangCode {
@@ -141,7 +160,7 @@ export class DioramaHud {
       camGroup.appendChild(btn);
     }
 
-    // View modes
+    // View modes (+ built-in SVG export button visible only in [P] Print mode)
     const modeGroup = document.createElement('div');
     modeGroup.className = 'hud-group';
     this.acousticBtn = this.makeBtn('A', () => {
@@ -150,20 +169,28 @@ export class DioramaHud {
     this.printBtn = this.makeBtn('P', () => {
       this.callbacks.onMode(this.currentMode === 'print' ? 'diorama' : 'print');
     });
-    modeGroup.append(this.acousticBtn, this.printBtn);
+    this.svgExportBtn = this.makeBtn('↓', () => {
+      this.callbacks.onExportSvg();
+    });
+    this.svgExportBtn.id = 'btn-export-svg';
+    this.svgExportBtn.classList.add('hud-btn-svg', 'hud-btn-hidden');
+    this.svgExportBtn.hidden = true;
+    modeGroup.append(this.acousticBtn, this.printBtn, this.svgExportBtn);
 
     // Actions
     const actionGroup = document.createElement('div');
     actionGroup.className = 'hud-group';
     this.bellBtn = this.makeBtn('␣', () => this.callbacks.onBell());
     this.soundBtn = this.makeBtn('M', () => {
-      this.soundEnabled = this.callbacks.onToggleSound();
+      this.soundState = this.callbacks.onToggleSound();
       this.renderText();
       this.syncState();
     });
+    this.soundBtn.id = 'btn-sound-toggle';
     this.langBtn = this.makeBtn('', () => {
       this.lang = this.lang === 'zh' ? 'en' : 'zh';
       this.renderText();
+      this.syncLangToUrl();
     });
     actionGroup.append(this.bellBtn, this.soundBtn, this.langBtn);
 
@@ -220,7 +247,7 @@ export class DioramaHud {
 
   private setBtnLabel(btn: HTMLButtonElement, label: string): void {
     const shortcut = btn.dataset.shortcut ?? '';
-    const keyName = shortcut === '␣' ? 'Space' : shortcut;
+    const keyName = shortcut === '␣' ? 'Space' : shortcut === '↓' ? '' : shortcut;
     btn.setAttribute('aria-label', keyName ? `${label} (${keyName})` : label);
     btn.innerHTML = shortcut
       ? `<span class="hud-key" aria-hidden="true">${shortcut}</span><span>${label}</span>`
@@ -245,8 +272,15 @@ export class DioramaHud {
 
     this.setBtnLabel(this.acousticBtn, t.acoustic);
     this.setBtnLabel(this.printBtn, t.print);
+    this.setBtnLabel(this.svgExportBtn, t.exportSvg);
     this.setBtnLabel(this.bellBtn, t.bell);
-    this.setBtnLabel(this.soundBtn, this.soundEnabled ? t.soundOn : t.soundOff);
+    const soundLabel =
+      this.soundState === 'on'
+        ? t.soundOn
+        : this.soundState === 'muted'
+        ? t.soundOff
+        : t.soundIdle;
+    this.setBtnLabel(this.soundBtn, soundLabel);
     this.setBtnLabel(this.langBtn, t.lang);
   }
 
@@ -267,8 +301,11 @@ export class DioramaHud {
     this.acousticBtn.setAttribute('aria-pressed', acousticActive ? 'true' : 'false');
     this.printBtn.classList.toggle('active', printActive);
     this.printBtn.setAttribute('aria-pressed', printActive ? 'true' : 'false');
-    this.soundBtn.classList.toggle('active-cyan', this.soundEnabled);
-    this.soundBtn.setAttribute('aria-pressed', this.soundEnabled ? 'true' : 'false');
+    this.svgExportBtn.hidden = !printActive;
+    this.svgExportBtn.classList.toggle('hud-btn-hidden', !printActive);
+    const soundOn = this.soundState === 'on';
+    this.soundBtn.classList.toggle('active-cyan', soundOn);
+    this.soundBtn.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
     document.body.classList.toggle('mode-print', printActive);
   }
 
@@ -276,12 +313,17 @@ export class DioramaHud {
     preset?: PresetName;
     camera?: CameraView;
     mode?: ViewMode;
+    soundState?: SoundState;
     soundEnabled?: boolean;
   }): void {
     if (state.preset) this.currentPreset = state.preset;
     if (state.camera) this.currentCamera = state.camera;
     if (state.mode) this.currentMode = state.mode;
-    if (state.soundEnabled !== undefined) this.soundEnabled = state.soundEnabled;
+    if (state.soundState !== undefined) {
+      this.soundState = state.soundState;
+    } else if (state.soundEnabled !== undefined) {
+      this.soundState = state.soundEnabled ? 'on' : 'muted';
+    }
     this.renderText();
     this.syncState();
   }

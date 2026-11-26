@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createSoftLightConeMaterial } from './atmosphere';
+import { getHKSignalState } from './hkSignal';
 import {
   createBauhiniaCanopyTexture,
   createBusShelterMapTexture,
@@ -2627,9 +2628,9 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
       }
     },
     update: (simTime) => {
-      // Shared 14-second Hong Kong Traffic Signal clock (+2.1s phase so hero t=0.25 sits warmly mid-green-man)
-      const sigClock = simTime + 2.1;
-      const sigT = ((sigClock % 14.0) + 14.0) % 14.0;
+      // Shared authentic 14-second Hong Kong Traffic Signal clock (+2.1s phase so hero t=0.25 sits mid-steady-green)
+      const sig = getHKSignalState(simTime);
+      const { sigT, cycleIndex } = sig;
 
       // 1. Rainy-breeze umbrella sway
       for (const u of animatedUmbrellas) {
@@ -2639,18 +2640,17 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
       // 2. Articulated walking pedestrians (promenade strolls + signal-synced zebra crossing walker!)
       for (const w of animatedWalkers) {
         if (w.path.obeySignal) {
-          // Synced strictly to 14s HK pedestrian green window (0.85s..8.15s cross; rest waits politely at curb!)
-          const cycleIdx = Math.floor(sigClock / 14.0);
-          const forward = ((cycleIdx % 2) + 2) % 2 === 0;
-          const isCrossing = sigT >= 0.85 && sigT <= 8.15;
-          const rawU = sigT < 0.85 ? 0 : sigT > 8.15 ? 1 : (sigT - 0.85) / 7.30;
+          // Synced strictly to 14s HK pedestrian green window (0.85s..7.60s cross; safely on curb before 7.7s Red Man!)
+          const forward = ((cycleIndex % 2) + 2) % 2 === 0;
+          const isCrossing = sigT >= 0.85 && sigT <= 7.60;
+          const rawU = sigT < 0.85 ? 0 : sigT > 7.60 ? 1 : (sigT - 0.85) / 6.75;
           const smoothU = rawU * rawU * (3 - 2 * rawU);
           const t = forward ? smoothU : 1.0 - smoothU;
           const px = THREE.MathUtils.lerp(w.path.x0, w.path.x1, t);
           const pz = THREE.MathUtils.lerp(w.path.z0, w.path.z1, t);
           const stepDir = Math.sign(w.path.x1 - w.path.x0) || 1;
           // Face across the road both while crossing and while waiting politely at either curb
-          const faceDir = (sigT > 8.15 ? (forward ? -1 : 1) : forward ? 1 : -1) * stepDir;
+          const faceDir = (sigT > 7.60 ? (forward ? -1 : 1) : forward ? 1 : -1) * stepDir;
           const strideAmp = isCrossing ? Math.sin(rawU * Math.PI) : 0;
           const stridePhase = simTime * 7.2 + 1.1;
           const bob = Math.abs(Math.sin(stridePhase)) * 0.032 * strideAmp;
@@ -2696,9 +2696,9 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
       dpdLampPivot.rotation.z = Math.sin(simTime * 1.85 + 0.6) * 0.065;
       dpdLampPivot.rotation.x = Math.cos(simTime * 1.42) * 0.045;
 
-      // 5. Authentic 14-second Hong Kong Traffic Signal & Flashing Green Man Cycle!
+      // 5. Authentic 5-stage (4-vehicle-phase) 14-second Hong Kong Traffic Signal & Flashing Green Man Cycle!
       const sc = currentEmissiveScale;
-      const desiredPedPhase: 'green' | 'red' = sigT < 8.5 ? 'green' : 'red';
+      const desiredPedPhase: 'green' | 'red' = sig.ped === 'RED' ? 'red' : 'green';
       if (desiredPedPhase !== pedSigPhase) {
         pedSigPhase = desiredPedPhase;
         const tex = desiredPedPhase === 'green' ? pedSigGreen : pedSigRed;
@@ -2706,33 +2706,22 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
         pedFaceMat.emissiveMap = tex.emissiveMap;
         pedFaceMat.needsUpdate = true;
       }
-      if (sigT < 6.0) {
-        // Vehicle RED · Pedestrian STEADY GREEN MAN (hero pose at t = 0.25)
-        vehRedLitMat.emissiveIntensity = 2.35 * sc;
-        vehAmberDimMat.emissiveIntensity = 0.14 * sc;
-        vehGreenDimMat.emissiveIntensity = 0.12 * sc;
+
+      // Vehicle lamps: RED -> RED_AMBER (after Ped RED!) -> GREEN -> AMBER
+      vehRedLitMat.emissiveIntensity =
+        (sig.vehicle === 'RED' || sig.vehicle === 'RED_AMBER' ? 2.35 : 0.14) * sc;
+      vehAmberDimMat.emissiveIntensity =
+        (sig.vehicle === 'RED_AMBER' ? 2.05 : sig.vehicle === 'AMBER' ? 2.25 : 0.14) * sc;
+      vehGreenDimMat.emissiveIntensity = (sig.vehicle === 'GREEN' ? 2.35 : 0.12) * sc;
+
+      // Pedestrian signal face: STEADY_GREEN -> FLASHING_GREEN (2.8 Hz, cars still RED!) -> RED
+      if (sig.ped === 'STEADY_GREEN') {
         pedFaceMat.emissive.copy(pedGreenColor);
         pedFaceMat.emissiveIntensity = 1.85 * sc;
-      } else if (sigT < 8.5) {
-        // Vehicle RED + AMBER (HK pre-green warning!) · Pedestrian 2.8 Hz FLASHING GREEN MAN!
-        vehRedLitMat.emissiveIntensity = 2.35 * sc;
-        vehAmberDimMat.emissiveIntensity = 2.05 * sc;
-        vehGreenDimMat.emissiveIntensity = 0.12 * sc;
-        const flashOn = Math.sin(simTime * Math.PI * 5.6) > 0;
+      } else if (sig.ped === 'FLASHING_GREEN') {
         pedFaceMat.emissive.copy(pedGreenColor);
-        pedFaceMat.emissiveIntensity = (flashOn ? 2.05 : 0.25) * sc;
-      } else if (sigT < 12.5) {
-        // Vehicle GREEN · Pedestrian RED MAN
-        vehRedLitMat.emissiveIntensity = 0.14 * sc;
-        vehAmberDimMat.emissiveIntensity = 0.14 * sc;
-        vehGreenDimMat.emissiveIntensity = 2.35 * sc;
-        pedFaceMat.emissive.copy(pedRedColor);
-        pedFaceMat.emissiveIntensity = 1.65 * sc;
+        pedFaceMat.emissiveIntensity = (sig.pedFlashOn ? 2.05 : 0.25) * sc;
       } else {
-        // Vehicle AMBER · Pedestrian RED MAN
-        vehRedLitMat.emissiveIntensity = 0.14 * sc;
-        vehAmberDimMat.emissiveIntensity = 2.25 * sc;
-        vehGreenDimMat.emissiveIntensity = 0.12 * sc;
         pedFaceMat.emissive.copy(pedRedColor);
         pedFaceMat.emissiveIntensity = 1.65 * sc;
       }
