@@ -3079,4 +3079,94 @@ export function createBusShelterMapTexture(): {
   };
 }
 
+/**
+ * Authentic Hong Kong Island-Line Wan Chai MTR glazed ceramic mosaic wall tiles
+ * (港鐵灣仔站深翠綠馬賽克磁磚) with subtle glazed sheen variation & clean horizontal accent band.
+ */
+export function createMtrMosaicTileTexture(): THREE.CanvasTexture {
+  const W = 256;
+  const H = 256;
+  const rand = mulberry32(198505);
+  const [canvas, ctx] = makeCanvas(W, H);
+
+  // Dark waterproof grout base
+  ctx.fillStyle = '#18332c';
+  ctx.fillRect(0, 0, W, H);
+
+  const sz = 16;
+  const palette = ['#236a54', '#2a755d', '#1f5e4b', '#2e7e64', '#266f58'];
+  for (let y = 0; y < H; y += sz) {
+    const row = Math.floor(y / sz);
+    const isStripe = row === 4 || row === 5;
+    const isDadoBase = row >= 13;
+    for (let x = 0; x < W; x += sz) {
+      let col: string;
+      if (isStripe) {
+        col = rand() > 0.4 ? '#d8e3db' : '#ccd9d0';
+      } else if (isDadoBase) {
+        col = rand() > 0.5 ? '#1b4a3c' : '#163f33';
+      } else {
+        col = palette[Math.floor(rand() * palette.length)];
+      }
+      ctx.fillStyle = col;
+      ctx.fillRect(x + 1, y + 1, sz - 2, sz - 2);
+
+      // Subtle ceramic bevel highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.fillRect(x + 1, y + 1, sz - 2, 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.10)';
+      ctx.fillRect(x + 1, y + sz - 3, sz - 2, 2);
+    }
+  }
+
+  // Subtle street-level damp splash darkening at bottom
+  const splash = ctx.createLinearGradient(0, H * 0.78, 0, H);
+  splash.addColorStop(0, 'rgba(8, 16, 14, 0)');
+  splash.addColorStop(1, 'rgba(8, 16, 14, 0.36)');
+  ctx.fillStyle = splash;
+  ctx.fillRect(0, H * 0.78, W, H * 0.22);
+
+  return toTexture(canvas, { repeatX: 2, repeatY: 1 });
+}
+
+/**
+ * Unified dark emerald-teal fascia panel capping the West Vending Alcove beside MTR Exit A3
+ * so the full canopy front elevation reads as one cohesive Hong Kong transit pavilion.
+ * Canvas 512 × 132 (AR = 3.879) matching BoxGeometry(2.60, 0.68, 0.16) (AR = 3.824) 1:1!
+ */
+export function createMtrVendingHeaderTexture(): {
+  map: THREE.CanvasTexture;
+  emissiveMap: THREE.CanvasTexture;
+} {
+  const W = 512;
+  const H = 132;
+  const draw = (emissiveOnly: boolean) => {
+    const [canvas, ctx] = makeCanvas(W, H);
+    ctx.fillStyle = emissiveOnly ? '#041a19' : '#0f423e';
+    ctx.fillRect(0, 0, W, H);
+
+    // Matching top/bottom anodized dark steel trim rails aligned with MTR Exit A3 fascia
+    ctx.fillStyle = emissiveOnly ? '#000000' : '#1a282e';
+    ctx.fillRect(0, 0, W, 9);
+    ctx.fillRect(0, H - 9, W, 9);
+
+    // Subtle hairline horizontal accent rule
+    ctx.fillStyle = emissiveOnly ? '#18544e' : '#35746c';
+    ctx.fillRect(24, H - 22, W - 48, 2);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = emissiveOnly ? '#8cd4c8' : '#d6ece6';
+    fitFontSize(ctx, '自 動 售 賣 機', 700, 32, 18, HK_SANS, W - 64);
+    ctx.fillText('自 動 售 賣 機', W * 0.5, 48);
+
+    ctx.fillStyle = emissiveOnly ? '#5ca8a0' : '#9cc8c0';
+    fitFontSize(ctx, 'BEVERAGE VENDING  ·  OCTOPUS', 600, 16, 11, HK_SANS, W - 64);
+    ctx.fillText('BEVERAGE VENDING  ·  OCTOPUS', W * 0.5, 88);
+
+    return toTexture(canvas, { wrap: false });
+  };
+  return { map: draw(false), emissiveMap: draw(true) };
+}
+
 

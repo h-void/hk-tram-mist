@@ -131,16 +131,23 @@ function bootScene(): void {
   const container = document.getElementById('app');
   if (!container) return;
 
-  // 1. WebGL2 Renderer
+  // 1. WebGL2 Renderer (EffectComposer owns offscreen RT, so disable unused default-backbuffer MSAA)
   const renderer = new THREE.WebGLRenderer({
-    antialias: true,
+    antialias: false,
     powerPreference: 'high-performance'
   });
   if (!renderer.capabilities.isWebGL2) {
     renderer.dispose();
     throw new Error('WebGL2 context is required');
   }
-  const initialDpr = Math.min(window.devicePixelRatio || 1, 2);
+  const MAX_SHADED_PIXELS = 2560 * 1440;
+  const computeEffectiveDpr = (w: number, h: number): number => {
+    const raw = Math.min(window.devicePixelRatio || 1, 2);
+    const area = Math.max(1, w * h);
+    const maxByBudget = Math.sqrt(MAX_SHADED_PIXELS / area);
+    return Math.max(1, Math.min(raw, maxByBudget));
+  };
+  const initialDpr = computeEffectiveDpr(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(initialDpr);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -206,7 +213,7 @@ function bootScene(): void {
   controls.maxPolarAngle = 1.32;
   controls.update();
 
-  // 4. Post-Processing Pipeline (RenderPass -> Restrained UnrealBloomPass -> OutputPass)
+  // 4. Post-Processing Pipeline (RenderPass -> Half-Res Restrained UnrealBloomPass -> OutputPass)
   const composerTarget = new THREE.WebGLRenderTarget(
     Math.max(1, window.innerWidth),
     Math.max(1, window.innerHeight),
@@ -222,13 +229,17 @@ function bootScene(): void {
 
   const bloomPass = new UnrealBloomPass(
     new THREE.Vector2(
-      Math.max(1, Math.round(window.innerWidth * initialDpr)),
-      Math.max(1, Math.round(window.innerHeight * initialDpr))
+      Math.max(1, Math.round(window.innerWidth * initialDpr * 0.5)),
+      Math.max(1, Math.round(window.innerHeight * initialDpr * 0.5))
     ),
     ATMOSPHERE_PRESETS.dusk.bloomStrength,
     ATMOSPHERE_PRESETS.dusk.bloomRadius,
     ATMOSPHERE_PRESETS.dusk.bloomThreshold
   );
+  const origBloomSetSize = bloomPass.setSize.bind(bloomPass);
+  bloomPass.setSize = (w: number, h: number) => {
+    origBloomSetSize(Math.max(1, Math.round(w * 0.5)), Math.max(1, Math.round(h * 0.5)));
+  };
   if (!supportsHalfFloatRT) {
     bloomPass.renderTargetBright.texture.type = THREE.UnsignedByteType;
     for (const rt of bloomPass.renderTargetsHorizontal) {
@@ -266,6 +277,18 @@ function bootScene(): void {
       taxiGroup: viaductAndVehicles.taxiGroup
     }
   });
+
+  // Exclude high-fillrate weather/mist & microscopic sub-details from the blurred planar road reflection pass
+  const reflectionExclusions: THREE.Object3D[] = [
+    atmosphere.mistGroup,
+    weatherAndEffects.group
+  ];
+  scene.traverse((obj) => {
+    if (obj.userData && obj.userData.skipReflection === true) {
+      reflectionExclusions.push(obj);
+    }
+  });
+  roadAndReflections.addReflectionExclusions(reflectionExclusions);
 
   // 6. Audio Soundscape & Minimalist Bilingual HUD
   const soundscape = new HKSoundscape();
@@ -611,7 +634,7 @@ function bootScene(): void {
     camera.bottom = -fSize / 2;
     camera.updateProjectionMatrix();
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = computeEffectiveDpr(w, h);
     renderer.setPixelRatio(dpr);
     composer.setPixelRatio(dpr);
     renderer.setSize(w, h);
@@ -824,6 +847,18 @@ function bootScene(): void {
     renderFrame();
   };
   rafId = requestAnimationFrame(animate);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    } else if (!contextLost && rafId === null) {
+      lastNow = performance.now();
+      rafId = requestAnimationFrame(animate);
+    }
+  });
 
   // 12. Expose Deterministic Inspection & Automation Controller Hook
   let ctrlRenderPending = false;

@@ -2,6 +2,11 @@ import * as THREE from 'three';
 import { applyRadialMistFade, type RadialMistUniforms } from './atmosphere';
 import { getHKSignalState } from './hkSignal';
 import {
+  createPlaneWithRectHole,
+  freezeStaticTransforms,
+  mergeStaticGroupByMaterial
+} from './perfUtils';
+import {
   createGlowSpriteTexture,
   createManholeTexture,
   createPlazaPaverTexture,
@@ -148,7 +153,7 @@ function createDoubleYellowPaintTexture(): THREE.CanvasTexture {
 
 /**
  * Orthographic-compatible planar wet-road reflector.
- * Uses 768x768 HalfFloat RT without MSAA (9-tap anisotropic wet-asphalt blur + procedural
+ * Uses 512x512 HalfFloat RT without MSAA (9-tap anisotropic wet-asphalt blur + procedural
  * GLSL raindrop ripple normal perturbation) and zero per-frame object allocations.
  */
 class PlanarWetReflector extends THREE.Mesh {
@@ -156,6 +161,8 @@ class PlanarWetReflector extends THREE.Mesh {
   private virtualCamera: THREE.OrthographicCamera;
   private textureMatrix = new THREE.Matrix4();
   private shaderMat: THREE.ShaderMaterial;
+  private hiddenList: THREE.Object3D[];
+  private prevVis: boolean[];
 
   constructor(
     width: number,
@@ -166,7 +173,7 @@ class PlanarWetReflector extends THREE.Mesh {
     renderTargetType: THREE.TextureDataType = THREE.HalfFloatType
   ) {
     const geom = new THREE.PlaneGeometry(width, height);
-    const renderTarget = new THREE.WebGLRenderTarget(768, 768, {
+    const renderTarget = new THREE.WebGLRenderTarget(512, 512, {
       type: renderTargetType,
       samples: 0,
       minFilter: THREE.LinearFilter,
@@ -294,6 +301,8 @@ class PlanarWetReflector extends THREE.Mesh {
     this.renderTarget = renderTarget;
     this.textureMatrix = textureMatrix;
     this.shaderMat = mat;
+    this.hiddenList = hiddenDuringReflection;
+    this.prevVis = new Array(hiddenDuringReflection.length);
     this.virtualCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 200);
     this.rotation.x = -Math.PI / 2;
     this.position.set(0, mirrorY, 0);
@@ -306,7 +315,6 @@ class PlanarWetReflector extends THREE.Mesh {
     const lookTarget = new THREE.Vector3();
     const reflectedTarget = new THREE.Vector3();
     const rotMat = new THREE.Matrix4();
-    const prevVis: boolean[] = new Array(hiddenDuringReflection.length);
 
     this.onBeforeRender = (renderer, scene, camera) => {
       if (!this.visible) return;
@@ -351,9 +359,11 @@ class PlanarWetReflector extends THREE.Mesh {
       this.textureMatrix.multiply(this.virtualCamera.matrixWorldInverse);
       this.textureMatrix.multiply(this.matrixWorld);
 
-      for (let i = 0; i < hiddenDuringReflection.length; i++) {
-        prevVis[i] = hiddenDuringReflection[i].visible;
-        hiddenDuringReflection[i].visible = false;
+      const hList = this.hiddenList;
+      const pVis = this.prevVis;
+      for (let i = 0; i < hList.length; i++) {
+        pVis[i] = hList[i].visible;
+        hList[i].visible = false;
       }
       this.visible = false;
 
@@ -373,10 +383,19 @@ class PlanarWetReflector extends THREE.Mesh {
       renderer.xr.enabled = prevXr;
 
       this.visible = true;
-      for (let i = 0; i < hiddenDuringReflection.length; i++) {
-        hiddenDuringReflection[i].visible = prevVis[i];
+      for (let i = 0; i < hList.length; i++) {
+        hList[i].visible = pVis[i];
       }
     };
+  }
+
+  public addHiddenObjects(objs: THREE.Object3D[]): void {
+    for (const o of objs) {
+      if (!this.hiddenList.includes(o)) {
+        this.hiddenList.push(o);
+      }
+    }
+    this.prevVis = new Array(this.hiddenList.length);
   }
 
   public setReflectionStyle(tintHex: number, boost: number): void {
@@ -398,6 +417,7 @@ class PlanarWetReflector extends THREE.Mesh {
 export interface RoadAndReflectionsSystem {
   group: THREE.Group;
   reflector: PlanarWetReflector;
+  addReflectionExclusions: (objs: THREE.Object3D[]) => void;
   setReflectionStyle: (tintHex: number, boost: number) => void;
   setPrintMode: (enabled: boolean) => void;
   setGlowScale: (scale: number) => void;
@@ -417,14 +437,25 @@ export function createRoadAndReflections(
   const ROAD_LEN = 78.0;
   const roadMistFade = { innerR: 16.5, outerR: 25.5 };
 
-  // 1. Extended mist-faded outer ground plane (180x180 at y = -0.02)
+  // Exact world-space opening for the recessed descending MTR Exit A3 stairwell pit
+  const MTR_PIT = { minX: 9.18, maxX: 13.32, minZ: -0.22, maxZ: 1.94 };
+
+  // 1. Extended mist-faded outer ground plane (180x180 at y = -0.02) with clean MTR stairwell opening
   const groundMat = new THREE.MeshStandardMaterial({
     color: 0x5c6d7e,
     roughness: 0.92,
     metalness: 0.04
   });
   applyRadialMistFade(groundMat, mistUniforms, roadMistFade);
-  const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(180, 180), groundMat);
+  const groundGeom = createPlaneWithRectHole(
+    180,
+    180,
+    MTR_PIT.minX,
+    MTR_PIT.maxX,
+    -MTR_PIT.maxZ,
+    -MTR_PIT.minZ
+  );
+  const groundMesh = new THREE.Mesh(groundGeom, groundMat);
   groundMesh.rotation.x = -Math.PI / 2;
   groundMesh.position.y = -0.02;
   groundMesh.receiveShadow = true;
@@ -635,8 +666,8 @@ export function createRoadAndReflections(
   addPuddleGlow(-3.6, 5.4, 3.8, 3.6, 0xff5448, 0.14);
   // Subtle icy-cyan & warm-white reflection spill outside East Plaza vending machines & MTR Exit A3
   addPuddleGlow(3.3, 3.5, 5.2, 4.6, 0x5cd8f6, 0.18);
-  addPuddleGlow(7.65, 3.65, 4.0, 3.2, 0x6ce2fa, 0.16, 0.175);
-  addPuddleGlow(11.1, 3.15, 4.4, 3.0, 0xffe0a8, 0.16, 0.175);
+  addPuddleGlow(7.65, 3.35, 3.6, 2.6, 0x6ce2fa, 0.15, 0.175);
+  addPuddleGlow(11.25, 3.25, 4.2, 2.2, 0xffe0a8, 0.14, 0.175);
   // Warm amber damp-granite spill outside east plaza newspaper kiosk (9.4, 7.4) & phone booth
   addPuddleGlow(8.7, 8.2, 4.4, 3.8, 0xffb250, 0.19, 0.175);
   // Crisp cyan wet sheen outside far-right B4 24H convenience store (15.4, -9.6)
@@ -745,10 +776,22 @@ export function createRoadAndReflections(
 
   const buildOpenSidewalk = (side: -1 | 1) => {
     const swGroup = new THREE.Group();
-    const topDeck = new THREE.Mesh(new THREE.PlaneGeometry(sidewalkWidth, sidewalkLen), sidewalkTopMat);
+    const deckCenterX = side * (5.1 + sidewalkWidth * 0.5);
+    const topGeom =
+      side === 1
+        ? createPlaneWithRectHole(
+            sidewalkWidth,
+            sidewalkLen,
+            MTR_PIT.minX - deckCenterX,
+            MTR_PIT.maxX - deckCenterX,
+            -MTR_PIT.maxZ,
+            -MTR_PIT.minZ
+          )
+        : new THREE.PlaneGeometry(sidewalkWidth, sidewalkLen);
+    const topDeck = new THREE.Mesh(topGeom, sidewalkTopMat);
     topDeck.name = 'SidewalkOuterDeck';
     topDeck.rotation.x = -Math.PI / 2;
-    topDeck.position.set(side * (5.1 + sidewalkWidth * 0.5), sidewalkY, 0);
+    topDeck.position.set(deckCenterX, sidewalkY, 0);
     topDeck.receiveShadow = true;
     swGroup.add(topDeck);
 
@@ -864,11 +907,13 @@ export function createRoadAndReflections(
     makeBlisterPad(-5.60, 3.4, 0.68, 1.48); // Zebra crossing tactile warning pad
     makeBlisterPad(-5.68, 7.0, 0.56, 1.32); // Tram stop boarding warning pad
 
-    // East sidewalk guide path running along x = +6.15 -> connects Zebra (z=3.4) to MTR Exit A3 (z=2.5..3.4, x=6.15..11.0)!
+    // East sidewalk guide path along x = +6.15 -> seamless L-turn into full-width MTR Exit A3 stairwell pad!
     makeStripMesh(6.15, 3.4, 0.32, 12.2, false);
     makeBlisterPad(5.60, 3.4, 0.68, 1.48); // East zebra crossing tactile warning pad
-    makeStripMesh(8.65, 3.4, 4.7, 0.32, true); // East branch leading straight to MTR Exit A3 stairwell!
-    makeBlisterPad(11.15, 2.85, 1.28, 0.56); // MTR Exit A3 stairwell top warning pad
+    makeStripMesh(8.68, 3.4, 4.76, 0.32, true); // East branch along z=3.4 from x=6.30 to x=11.06
+    makeBlisterPad(11.25, 3.40, 0.38, 0.38); // Tactile turn blister tile centered on MTR Exit A3
+    makeStripMesh(11.25, 2.95, 0.32, 0.54, false); // North connector straight into top-of-stairs warning pad
+    makeBlisterPad(11.25, 2.46, 3.84, 0.44); // Full-width MTR Exit A3 top-of-stairs tactile warning strip
 
     // Sidewalk cast-iron inspection covers
     for (const [mx, mz] of [
@@ -883,6 +928,7 @@ export function createRoadAndReflections(
       zoningGroup.add(mh);
     }
 
+    mergeStaticGroupByMaterial(zoningGroup, { skipTinyInReflection: true, namePrefix: 'ZoningBatch' });
     group.add(zoningGroup);
   }
 
@@ -893,6 +939,9 @@ export function createRoadAndReflections(
     metalness: 0.42
   });
   applyRadialMistFade(railingMat, mistUniforms, { innerR: 16.0, outerR: 24.5 });
+
+  const curbRailingsGroup = new THREE.Group();
+  curbRailingsGroup.name = 'CurbRailingsGroup';
 
   const buildRailingSegment = (x: number, zStart: number, zEnd: number) => {
     const segLen = zEnd - zStart;
@@ -928,7 +977,7 @@ export function createRoadAndReflections(
       rGroup.add(bar);
     }
 
-    group.add(rGroup);
+    curbRailingsGroup.add(rGroup);
   };
 
   // West curb railings (clean gaps for viaduct [-5.6..-2.0], zebra [2.2..4.6], and tram stop [5.6..8.4])
@@ -943,6 +992,14 @@ export function createRoadAndReflections(
   buildRailingSegment(5.28, 4.6, 9.4);
   buildRailingSegment(5.28, 13.8, 23.0);
 
+  mergeStaticGroupByMaterial(curbRailingsGroup, { namePrefix: 'CurbRailingBatch' });
+  group.add(curbRailingsGroup);
+
+  // Batch static road markings and tram rails into minimal draw calls
+  mergeStaticGroupByMaterial(markingsGroup, { skipTinyInReflection: true, namePrefix: 'RoadMarkingsBatch' });
+  mergeStaticGroupByMaterial(railsGroup, { namePrefix: 'TramRailsBatch' });
+  freezeStaticTransforms(group);
+
   scene.add(group);
 
   let currentGlowScale = 1.0;
@@ -950,6 +1007,9 @@ export function createRoadAndReflections(
   return {
     group,
     reflector,
+    addReflectionExclusions: (objs) => {
+      reflector.addHiddenObjects(objs);
+    },
     setReflectionStyle: (tintHex, boost) => {
       reflector.setReflectionStyle(tintHex, boost);
     },

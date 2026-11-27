@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createSoftLightConeMaterial } from './atmosphere';
 import { getHKSignalState } from './hkSignal';
+import { freezeStaticTransforms, mergeStaticGroupByMaterial } from './perfUtils';
 import {
   createBauhiniaCanopyTexture,
   createBusShelterMapTexture,
@@ -412,19 +413,24 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     metalness: 0.06
   });
 
+  const roundShadowMatCache = new Map<string, THREE.MeshBasicMaterial>();
   const addRoundAO = (x: number, z: number, radius: number, opacity = 0.54) => {
-    const m = new THREE.Mesh(
-      new THREE.PlaneGeometry(radius * 2, radius * 2),
-      new THREE.MeshBasicMaterial({
+    const key = opacity.toFixed(2);
+    let mat = roundShadowMatCache.get(key);
+    if (!mat) {
+      mat = new THREE.MeshBasicMaterial({
         map: roundShadowTex,
         transparent: true,
         opacity,
         depthWrite: false
-      })
-    );
+      });
+      roundShadowMatCache.set(key, mat);
+    }
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(radius * 2, radius * 2), mat);
     m.rotation.x = -Math.PI / 2;
     m.position.set(x, Y0 + 0.014, z);
     m.renderOrder = 3;
+    m.userData.skipReflection = true;
     group.add(m);
   };
 
@@ -1100,10 +1106,11 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     addHKBollard(5.38, 9.26);
     addHKBollard(-5.38, 5.72);
 
-    // C. Weathered Roadside Electrical Feeder Box (電箱 HKE-042) tucked cleanly beside kiosk east wall
+    // C. Weathered Roadside Electrical Feeder Box (電箱 HKE-042) tucked cleanly beside MTR Exit A3 east wall
     const eBox = new THREE.Group();
     eBox.name = 'HK_ElectricalFeederBox';
-    eBox.position.set(9.95, Y0, 8.25);
+    eBox.position.set(14.22, Y0, 0.05);
+    eBox.rotation.y = Math.PI / 2;
 
     const eSideMat = new THREE.MeshStandardMaterial({
       color: 0x576661,
@@ -1143,7 +1150,7 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     eBox.add(hasp);
 
     group.add(eBox);
-    addRoundAO(9.95, 8.25, 0.66, 0.52);
+    addRoundAO(14.22, 0.05, 0.66, 0.50);
   }
 
   // =========================================================================
@@ -1300,15 +1307,20 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
   // =========================================================================
   // 5. CLASSIC HONG KONG ORANGE RUBBISH BINS (香港橙色垃圾桶)
   // =========================================================================
+  const binOrangeMat = new THREE.MeshStandardMaterial({
+    color: 0xd96128,
+    roughness: 0.46,
+    metalness: 0.08
+  });
+  const binAshMat = new THREE.MeshStandardMaterial({
+    color: 0x9aa8b4,
+    roughness: 0.35,
+    metalness: 0.7
+  });
   const addHKRubbishBin = (x: number, z: number) => {
     const bin = new THREE.Group();
     bin.position.set(x, Y0, z);
-    const orangeMat = new THREE.MeshStandardMaterial({
-      color: 0xd96128,
-      roughness: 0.46,
-      metalness: 0.08
-    });
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.22, 0.68, 14), orangeMat);
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.22, 0.68, 14), binOrangeMat);
     body.position.y = 0.34;
     body.castShadow = true;
     bin.add(body);
@@ -1317,15 +1329,12 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     hood.position.y = 0.82;
     bin.add(hood);
 
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.23, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), orangeMat);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.23, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), binOrangeMat);
     cap.position.y = 0.94;
     bin.add(cap);
 
     const ash = markSkipPrintEdges(
-      new THREE.Mesh(
-        new THREE.CylinderGeometry(0.11, 0.11, 0.03, 10),
-        new THREE.MeshStandardMaterial({ color: 0x9aa8b4, roughness: 0.35, metalness: 0.7 })
-      )
+      new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.03, 10), binAshMat)
     );
     ash.position.y = 1.16;
     bin.add(ash);
@@ -1335,7 +1344,7 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
   };
 
   addHKRubbishBin(-6.0, 8.8);
-  addHKRubbishBin(13.85, 2.65);
+  addHKRubbishBin(14.08, 1.55);
 
   // =========================================================================
   // 6. T-SHAPED 灣仔道 WAN CHAI RD PLAQUE, ROUND 電車站 TRAM STOP & CONVEX MIRROR
@@ -1904,11 +1913,11 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
   // & HERITAGE HONG KONG PILLAR POSTBOX (郵筒) ON EAST PLAZA
   // =========================================================================
   {
-    // A. Vintage Illuminated Hong Kong Telephone Booth at (10.55, 5.75) — clear of MTR Exit A3, kiosk & Banyan!
+    // A. Vintage Illuminated Hong Kong Telephone Booth at (11.45, 5.78) — cleanly clear of kiosk roof, MTR Exit A3 & Banyan!
     const booth = new THREE.Group();
     booth.name = 'HK_TelephoneBooth';
-    booth.position.set(10.55, Y0, 5.75);
-    booth.rotation.y = -0.18;
+    booth.position.set(11.45, Y0, 5.78);
+    booth.rotation.y = -0.14;
 
     const boothGlassMat = new THREE.MeshStandardMaterial({
       color: 0xbce6f4,
@@ -1985,7 +1994,7 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     booth.add(phoneShelf);
 
     group.add(booth);
-    addRoundAO(10.55, 5.75, 0.68, 0.48);
+    addRoundAO(11.45, 5.78, 0.68, 0.48);
 
     // B. Heritage Hong Kong Cast-Iron Pillar Postbox (郵筒) at (6.05, 5.85)
     const postbox = new THREE.Group();
@@ -2099,6 +2108,7 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
       );
     }
     umbGroup.add(ribsGroup);
+    mergeStaticGroupByMaterial(ribsGroup, { skipTinyInReflection: true, namePrefix: 'UmbrellaRibs' });
 
     return umbGroup;
   };
@@ -2236,6 +2246,13 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     walkPath?: WalkPathSpec;
   }
 
+  const pedSkinMat = new THREE.MeshStandardMaterial({ color: 0xe6c4a8, roughness: 0.7 });
+  const pedHairMat = new THREE.MeshStandardMaterial({ color: 0x22262c, roughness: 0.8 });
+  const pedPantsMat = new THREE.MeshStandardMaterial({ color: 0x263240, roughness: 0.85 });
+  const pedBriefcaseMat = new THREE.MeshStandardMaterial({ color: 0x4b2e1f, roughness: 0.56 });
+  const pedToteMat = new THREE.MeshStandardMaterial({ color: 0xe6dcc4, roughness: 0.74 });
+  const pedNewspaperMat = new THREE.MeshStandardMaterial({ color: 0xebe4d4, roughness: 0.78 });
+
   const addPedestrian = (opts: PedestrianOpts): THREE.Group => {
     const ped = new THREE.Group();
     const baseY = opts.walkPath?.baseY ?? Y0;
@@ -2243,9 +2260,9 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     ped.rotation.y = opts.rotY;
 
     const coatMat = new THREE.MeshStandardMaterial({ color: opts.coatColor, roughness: 0.78 });
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0xe6c4a8, roughness: 0.7 });
-    const hairMat = new THREE.MeshStandardMaterial({ color: 0x22262c, roughness: 0.8 });
-    const pantsMat = new THREE.MeshStandardMaterial({ color: 0x263240, roughness: 0.85 });
+    const skinMat = pedSkinMat;
+    const hairMat = pedHairMat;
+    const pantsMat = pedPantsMat;
 
     const yOff = opts.seated ? -0.22 : 0;
     let legLPivot: THREE.Group | null = null;
@@ -2326,28 +2343,19 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     // Optional handheld accessory (leather briefcase, shopping tote bag, or folded newspaper)
     if (opts.accessory === 'briefcase') {
       const bc = markSkipPrintEdges(
-        new THREE.Mesh(
-          new THREE.BoxGeometry(0.07, 0.24, 0.32),
-          new THREE.MeshStandardMaterial({ color: 0x4b2e1f, roughness: 0.56 })
-        )
+        new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.24, 0.32), pedBriefcaseMat)
       );
       bc.position.set(-0.22, 0.48 + yOff, 0.04);
       ped.add(bc);
     } else if (opts.accessory === 'tote') {
       const tote = markSkipPrintEdges(
-        new THREE.Mesh(
-          new THREE.BoxGeometry(0.09, 0.26, 0.24),
-          new THREE.MeshStandardMaterial({ color: 0xe6dcc4, roughness: 0.74 })
-        )
+        new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.26, 0.24), pedToteMat)
       );
       tote.position.set(-0.22, 0.46 + yOff, 0.05);
       ped.add(tote);
     } else if (opts.accessory === 'newspaper') {
       const np = markSkipPrintEdges(
-        new THREE.Mesh(
-          new THREE.CylinderGeometry(0.03, 0.03, 0.28, 8),
-          new THREE.MeshStandardMaterial({ color: 0xebe4d4, roughness: 0.78 })
-        )
+        new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.28, 8), pedNewspaperMat)
       );
       np.rotation.x = Math.PI / 2;
       np.position.set(-0.18, 0.68 + yOff, 0.04);
@@ -2451,11 +2459,11 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     phase: 2.8
   });
 
-  // 4 & 5. Couple walking together under a SHARED translucent umbrella near glowing cyan vending machines!
+  // 4 & 5. Couple browsing the glowing beverage vending machines under a SHARED translucent umbrella (clear of tactile strip!)
   addPedestrian({
-    x: 7.36,
-    z: 4.02,
-    rotY: Math.PI * 0.94,
+    x: 7.42,
+    z: 2.78,
+    rotY: Math.PI * 0.96,
     coatColor: 0x32465a,
     scarfColor: 0x8ea8c2,
     umbrellaColor: 0x88cde8,
@@ -2465,8 +2473,8 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     phase: 4.1
   });
   addPedestrian({
-    x: 7.68,
-    z: 3.96,
+    x: 7.74,
+    z: 2.75,
     rotY: Math.PI * 1.04,
     coatColor: 0x9b7a5e,
     scarfColor: 0xd94e52,
@@ -2520,11 +2528,11 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     phase: 3.4
   });
 
-  // 9. Office commuter stepping out of Wan Chai MTR Exit A3 into the misty drizzle
+  // 9. Office commuter stepping out of Wan Chai MTR Exit A3 past the tactile warning pad
   addPedestrian({
-    x: 10.75,
-    z: 3.18,
-    rotY: -Math.PI * 0.14,
+    x: 10.45,
+    z: 3.04,
+    rotY: -Math.PI * 0.10,
     coatColor: 0x354454,
     scarfColor: 0xc8604c,
     accessory: 'briefcase',
@@ -2586,12 +2594,27 @@ export function createPropsAndLife(scene: THREE.Scene): PropsAndLifeSystem {
     walkPath: { x0: 4.65, z0: 3.42, x1: -4.65, z1: 3.42, speed: 1.25, phase: 0.0, baseY: 0.04, obeySignal: true }
   });
 
-  scene.add(group);
-
-  // Locate roof cat pivots from the kiosk group for smooth tail & head animations
+  // Locate roof cat pivots from the kiosk group BEFORE batching so animated pivots stay intact
   const kioskObj = group.getObjectByName('HK_NewspaperKiosk');
   const catHeadPivot = (kioskObj?.userData.catHeadPivot as THREE.Group | undefined) ?? null;
   const catTailPivot = (kioskObj?.userData.catTailPivot as THREE.Group | undefined) ?? null;
+
+  const dynamicPropRoots = new Set<THREE.Object3D>([
+    dpdLampPivot,
+    ...animatedUmbrellas.map((u) => u.obj),
+    ...animatedWalkers.map((w) => w.root)
+  ]);
+  if (catHeadPivot) dynamicPropRoots.add(catHeadPivot);
+  if (catTailPivot) dynamicPropRoots.add(catTailPivot);
+
+  mergeStaticGroupByMaterial(group, {
+    excludeRoots: dynamicPropRoots,
+    skipTinyInReflection: true,
+    namePrefix: 'PropsStaticBatch'
+  });
+  freezeStaticTransforms(group, dynamicPropRoots);
+
+  scene.add(group);
 
   let currentEmissiveScale = 1.06;
   let printModeActive = false;

@@ -4,24 +4,6 @@ import { applyRadialMistFade, type RadialMistUniforms } from './atmosphere';
 import { getHKSignalState } from './hkSignal';
 import { createRippleTexture } from './textures';
 
-interface RainSeed {
-  x: number;
-  y0: number;
-  z: number;
-  speed: number;
-  len: number;
-}
-
-interface RippleItem {
-  mesh: THREE.Mesh;
-  mat: THREE.MeshBasicMaterial;
-  x: number;
-  z: number;
-  period: number;
-  phase: number;
-  maxScale: number;
-}
-
 interface PetalSeed {
   origin: THREE.Vector3;
   offsetAngle: number;
@@ -233,43 +215,64 @@ export function createWeatherAndEffects(
   const rand = mulberry32(202608);
 
   // =========================================================================
-  // 1. DELICATE TAPERED GLSL DIAGONAL RAIN STREAKS (~620 silky streaks fading softly into mist)
+  // 1. DELICATE TAPERED GLSL DIAGONAL RAIN STREAKS (~620 silky streaks, 100% GPU vertex animated!)
   // =========================================================================
   const RAIN_COUNT = 620;
-  const rainSeeds: RainSeed[] = [];
-  const rainPositions = new Float32Array(RAIN_COUNT * 2 * 3);
-  const rainEnds = new Float32Array(RAIN_COUNT * 2);
+  const rainOrigins = new Float32Array(RAIN_COUNT * 2 * 3);
+  const rainParams = new Float32Array(RAIN_COUNT * 2 * 3); // (speed, len, end)
 
   for (let i = 0; i < RAIN_COUNT; i++) {
-    rainSeeds.push({
-      x: (rand() - 0.5) * 44,
-      y0: rand() * 19,
-      z: (rand() - 0.5) * 44,
-      speed: 13.0 + rand() * 5.2,
-      len: 0.46 + rand() * 0.38
-    });
-    // Top tail = 0.0 (transparent), falling tip = 1.0 (soft luminous droplet glint)
-    rainEnds[i * 2] = 0.0;
-    rainEnds[i * 2 + 1] = 1.0;
+    const rx = (rand() - 0.5) * 44;
+    const ry0 = rand() * 19;
+    const rz = (rand() - 0.5) * 44;
+    const speed = 13.0 + rand() * 5.2;
+    const len = 0.46 + rand() * 0.38;
+
+    const pIdx = i * 6;
+    // Top tail vertex (end = 0.0) & falling tip vertex (end = 1.0)
+    rainOrigins[pIdx] = rx;
+    rainOrigins[pIdx + 1] = ry0;
+    rainOrigins[pIdx + 2] = rz;
+    rainOrigins[pIdx + 3] = rx;
+    rainOrigins[pIdx + 4] = ry0;
+    rainOrigins[pIdx + 5] = rz;
+
+    rainParams[pIdx] = speed;
+    rainParams[pIdx + 1] = len;
+    rainParams[pIdx + 2] = 0.0;
+    rainParams[pIdx + 3] = speed;
+    rainParams[pIdx + 4] = len;
+    rainParams[pIdx + 5] = 1.0;
   }
 
   const rainGeom = new THREE.BufferGeometry();
-  rainGeom.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
-  rainGeom.setAttribute('aEnd', new THREE.BufferAttribute(rainEnds, 1));
+  rainGeom.setAttribute('position', new THREE.BufferAttribute(rainOrigins, 3));
+  rainGeom.setAttribute('aParams', new THREE.BufferAttribute(rainParams, 3));
   const rainMat = new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
     uniforms: {
       uColor: { value: new THREE.Color(0x9cb8d4) },
-      uOpacity: { value: 0.16 }
+      uOpacity: { value: 0.16 },
+      uTime: { value: 0.0 }
     },
     vertexShader: /* glsl */ `
-      attribute float aEnd;
+      uniform float uTime;
+      attribute vec3 aParams;
       varying float vEnd;
       varying float vRadialFade;
       void main() {
-        vEnd = aEnd;
-        vec4 wp = modelMatrix * vec4(position, 1.0);
+        float speed = aParams.x;
+        float len = aParams.y;
+        float endFlag = aParams.z;
+        vEnd = endFlag;
+        float y = mod(mod(position.y - uTime * speed, 19.0) + 19.0, 19.0);
+        vec3 animated = vec3(
+          position.x - endFlag * len * 0.20,
+          y + (1.0 - endFlag) * len,
+          position.z + endFlag * len * 0.06
+        );
+        vec4 wp = modelMatrix * vec4(animated, 1.0);
         float dist = length(wp.xz);
         vRadialFade = 1.0 - smoothstep(14.5, 25.0, dist);
         gl_Position = projectionMatrix * viewMatrix * wp;
@@ -294,41 +297,35 @@ export function createWeatherAndEffects(
   group.add(rainLines);
 
   // =========================================================================
-  // 2. SOFT CONCENTRIC EXPANDING WET PUDDLE RIPPLES ON ROAD (y = 0.045)
+  // 2. SOFT CONCENTRIC EXPANDING WET PUDDLE RIPPLES (collected for single GPU InstancedMesh!)
   // =========================================================================
-  const rippleGroup = new THREE.Group();
-  rippleGroup.name = 'PuddleRipples';
   const rippleTex = createRippleTexture();
-  const rippleGeom = new THREE.PlaneGeometry(1.0, 1.0);
-  rippleGeom.rotateX(-Math.PI / 2);
-
-  const ripples: RippleItem[] = [];
+  const roadRippleSpecs: Array<{
+    x: number;
+    y: number;
+    z: number;
+    period: number;
+    phase: number;
+    minScale: number;
+    scaleSpan: number;
+    duty: number;
+    peakOpacity: number;
+    tintMix: number;
+  }> = [];
   for (let i = 0; i < 34; i++) {
-    const mat = new THREE.MeshBasicMaterial({
-      map: rippleTex,
-      color: 0xa4c4de,
-      transparent: true,
-      opacity: 0.13,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-    const mesh = new THREE.Mesh(rippleGeom, mat);
-    const rx = (rand() - 0.5) * 8.8;
-    const rz = (rand() - 0.5) * 26.0;
-    mesh.position.set(rx, 0.045, rz);
-    mesh.renderOrder = 5;
-    rippleGroup.add(mesh);
-    ripples.push({
-      mesh,
-      mat,
-      x: rx,
-      z: rz,
+    roadRippleSpecs.push({
+      x: (rand() - 0.5) * 8.8,
+      y: 0.045,
+      z: (rand() - 0.5) * 26.0,
       period: 1.15 + rand() * 1.15,
       phase: rand() * 4.0,
-      maxScale: 0.34 + rand() * 0.38
+      minScale: 0.14,
+      scaleSpan: 0.34 + rand() * 0.38,
+      duty: 1.0,
+      peakOpacity: 0.14,
+      tintMix: 0.0
     });
   }
-  group.add(rippleGroup);
 
   // =========================================================================
   // 3. GENTLY DRIFTING BAUHINIA (洋紫荊) BLOSSOM PETALS
@@ -651,26 +648,116 @@ export function createWeatherAndEffects(
   eaveDripsInst.renderOrder = 8;
   group.add(eaveDripsInst);
 
-  // Synchronized tiny landing ripples directly under every awning & viaduct eave drip
-  const dripRippleGroup = new THREE.Group();
-  dripRippleGroup.name = 'EaveDripImpactRipples';
-  const dripImpactRipples: Array<{ mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }> = [];
-  for (const d of dripSeeds) {
-    const rMat = new THREE.MeshBasicMaterial({
-      map: rippleTex,
-      color: 0xbce0f6,
-      transparent: true,
-      opacity: 0.0,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-    const rm = new THREE.Mesh(rippleGeom, rMat);
-    rm.position.set(d.x, d.yBot + 0.012, d.z);
-    rm.renderOrder = 5;
-    dripRippleGroup.add(rm);
-    dripImpactRipples.push({ mesh: rm, mat: rMat });
+  // Synchronized GPU-animated Instanced Ripple Mesh (34 road puddle ripples + 20 eave drip impact ripples = 1 draw call!)
+  const allRippleSpecs = [
+    ...roadRippleSpecs,
+    ...dripSeeds.map((d) => ({
+      x: d.x,
+      y: d.yBot + 0.012,
+      z: d.z,
+      period: d.period,
+      phase: d.phase,
+      minScale: 0.08,
+      scaleSpan: 0.34,
+      duty: 0.42,
+      peakOpacity: 0.24,
+      tintMix: 1.0
+    }))
+  ];
+  const rippleCount = allRippleSpecs.length;
+  const baseRipplePlane = new THREE.PlaneGeometry(1.0, 1.0);
+  baseRipplePlane.rotateX(-Math.PI / 2);
+  const instRippleGeom = new THREE.InstancedBufferGeometry();
+  instRippleGeom.index = baseRipplePlane.index;
+  instRippleGeom.attributes.position = baseRipplePlane.attributes.position;
+  instRippleGeom.attributes.uv = baseRipplePlane.attributes.uv;
+  instRippleGeom.instanceCount = rippleCount;
+
+  const rCenters = new Float32Array(rippleCount * 3);
+  const rTimings = new Float32Array(rippleCount * 4);
+  const rScales = new Float32Array(rippleCount * 3);
+  for (let i = 0; i < rippleCount; i++) {
+    const r = allRippleSpecs[i];
+    rCenters[i * 3] = r.x;
+    rCenters[i * 3 + 1] = r.y;
+    rCenters[i * 3 + 2] = r.z;
+    rTimings[i * 4] = r.period;
+    rTimings[i * 4 + 1] = r.phase;
+    rTimings[i * 4 + 2] = r.duty;
+    rTimings[i * 4 + 3] = r.peakOpacity;
+    rScales[i * 3] = r.minScale;
+    rScales[i * 3 + 1] = r.scaleSpan;
+    rScales[i * 3 + 2] = r.tintMix;
   }
-  group.add(dripRippleGroup);
+  instRippleGeom.setAttribute('aCenter', new THREE.InstancedBufferAttribute(rCenters, 3));
+  instRippleGeom.setAttribute('aTiming', new THREE.InstancedBufferAttribute(rTimings, 4));
+  instRippleGeom.setAttribute('aScaleTint', new THREE.InstancedBufferAttribute(rScales, 3));
+
+  const allRipplesMat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uMap: { value: rippleTex },
+      uTime: { value: 0.0 },
+      uRainScale: { value: 1.0 },
+      uColorA: { value: new THREE.Color(0xa4c4de) },
+      uColorB: { value: new THREE.Color(0xbce0f6) }
+    },
+    vertexShader: /* glsl */ `
+      uniform float uTime;
+      uniform float uRainScale;
+      attribute vec3 aCenter;
+      attribute vec4 aTiming;
+      attribute vec3 aScaleTint;
+      varying vec2 vUv;
+      varying float vAlpha;
+      varying float vTint;
+      void main() {
+        vUv = uv;
+        vTint = aScaleTint.z;
+        float period = aTiming.x;
+        float phase = aTiming.y;
+        float duty = aTiming.z;
+        float peakOp = aTiming.w;
+
+        float t = mod(mod(uTime + phase, period) + period, period);
+        float u = t / period;
+        if (u >= duty) {
+          vAlpha = 0.0;
+          gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+          return;
+        }
+        float ru = u / duty;
+        float sc = aScaleTint.x + ru * aScaleTint.y;
+        vAlpha = sin(ru * 3.14159265) * peakOp * uRainScale;
+        vec3 wp = aCenter + position * sc;
+        gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(wp, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D uMap;
+      uniform vec3 uColorA;
+      uniform vec3 uColorB;
+      varying vec2 vUv;
+      varying float vAlpha;
+      varying float vTint;
+      void main() {
+        if (vAlpha < 0.002) discard;
+        vec4 tex = texture2D(uMap, vUv);
+        float a = tex.a * vAlpha;
+        if (a < 0.002) discard;
+        vec3 col = mix(uColorA, uColorB, vTint) * tex.rgb;
+        gl_FragColor = vec4(col, a);
+      }
+    `
+  });
+
+  const allRipplesMesh = new THREE.Mesh(instRippleGeom, allRipplesMat);
+  allRipplesMesh.name = 'AllRainRipplesInstanced';
+  allRipplesMesh.frustumCulled = false;
+  allRipplesMesh.renderOrder = 5;
+  group.add(allRipplesMesh);
 
   // =========================================================================
   // 5. [P] ARCHIVAL AXONOMETRIC PRINT MODE (Xuan Paper #F4EFE6 + Prussian/Pine/Cinnabar Ink)
@@ -1188,15 +1275,13 @@ export function createWeatherAndEffects(
   };
 
   let currentViewMode: ViewMode = 'diorama';
-  let currentRainBaseOpacity = 0.16;
 
   const setViewMode = (mode: ViewMode) => {
     currentViewMode = mode;
     acousticGroup.visible = mode === 'acoustic';
     const isPrint = mode === 'print';
     rainLines.visible = !isPrint;
-    rippleGroup.visible = !isPrint;
-    dripRippleGroup.visible = !isPrint;
+    allRipplesMesh.visible = !isPrint;
     petalInst.visible = !isPrint;
     steamGroup.visible = !isPrint;
     bellBurstGroup.visible = !isPrint;
@@ -1221,33 +1306,12 @@ export function createWeatherAndEffects(
     trainPos: THREE.Vector3,
     minibusPos: THREE.Vector3
   ) => {
-    // 1. Update delicate diagonal falling rain streaks deterministically from simTime
+    // 1 & 2. GPU-driven diagonal rain streaks & all 54 instanced road/drip ripples (0 CPU loops, 0 VBO uploads!)
     if (rainLines.visible) {
-      const posAttr = rainGeom.getAttribute('position') as THREE.BufferAttribute;
-      const arr = posAttr.array as Float32Array;
-      for (let i = 0; i < RAIN_COUNT; i++) {
-        const s = rainSeeds[i];
-        const y = ((s.y0 - simTime * s.speed) % 19.0 + 19.0) % 19.0;
-        const idx = i * 6;
-        arr[idx] = s.x;
-        arr[idx + 1] = y + s.len;
-        arr[idx + 2] = s.z;
-        arr[idx + 3] = s.x - s.len * 0.20;
-        arr[idx + 4] = y;
-        arr[idx + 5] = s.z + s.len * 0.06;
-      }
-      posAttr.needsUpdate = true;
+      rainMat.uniforms.uTime.value = simTime;
     }
-
-    // 2. Update wet road puddle ripples
-    if (rippleGroup.visible) {
-      for (const rp of ripples) {
-        const t = (((simTime + rp.phase) % rp.period) + rp.period) % rp.period;
-        const u = t / rp.period;
-        const sc = 0.14 + u * rp.maxScale;
-        rp.mesh.scale.set(sc, 1, sc);
-        rp.mat.opacity = Math.sin(u * Math.PI) * 0.14 * Math.min(1.45, currentRainBaseOpacity / 0.16);
-      }
+    if (allRipplesMesh.visible) {
+      allRipplesMat.uniforms.uTime.value = simTime;
     }
 
     // 3. Update gently drifting Bauhinia petals
@@ -1310,7 +1374,7 @@ export function createWeatherAndEffects(
       }
     }
 
-    // 3D. Update falling eave rain drips & synchronized ground impact splash ripples
+    // 3D. Update falling eave rain drips (landing impact ripples are synchronized on GPU in allRipplesMesh!)
     if (eaveDripsInst.visible) {
       for (let i = 0; i < dripSeeds.length; i++) {
         const d = dripSeeds[i];
@@ -1326,17 +1390,6 @@ export function createWeatherAndEffects(
         dummy.scale.set(sxz, sy, sxz);
         dummy.updateMatrix();
         eaveDripsInst.setMatrixAt(i, dummy.matrix);
-
-        // Impact splash ripple blooms right after drop hits (u wraps past 1.0 into 0..0.38)
-        const rip = dripImpactRipples[i];
-        if (u < 0.42) {
-          const ru = u / 0.42;
-          const rSc = 0.08 + ru * 0.34;
-          rip.mesh.scale.set(rSc, 1, rSc);
-          rip.mat.opacity = Math.sin(ru * Math.PI) * 0.24 * Math.min(1.4, currentRainBaseOpacity / 0.16);
-        } else {
-          rip.mat.opacity = 0.0;
-        }
       }
       eaveDripsInst.instanceMatrix.needsUpdate = true;
     }
@@ -1456,8 +1509,8 @@ export function createWeatherAndEffects(
   return {
     group,
     setRainOpacity: (opacity) => {
-      currentRainBaseOpacity = opacity;
       rainMat.uniforms.uOpacity.value = opacity;
+      allRipplesMat.uniforms.uRainScale.value = Math.min(1.45, opacity / 0.16);
     },
     setViewMode,
     setPrintEdgesVisible,

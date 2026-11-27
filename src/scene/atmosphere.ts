@@ -89,7 +89,8 @@ export function applyRadialMistFade(
     material.transparent = true;
   }
 
-  const cacheKey = `hk_radial_mist_${innerR.toFixed(1)}_${outerR.toFixed(1)}_${fadeAlpha ? 'a' : 'c'}`;
+  // uMistInnerR / uMistOuterR are runtime uniforms, so only fadeAlpha changes shader code!
+  const cacheKey = `hk_radial_mist_${fadeAlpha ? 'a' : 'c'}`;
   material.customProgramCacheKey = () => cacheKey;
 
   material.onBeforeCompile = (shader) => {
@@ -291,18 +292,19 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
     uMistEnabled: { value: 1.0 }
   };
 
-  scene.background = new THREE.Color(ATMOSPHERE_PRESETS.dusk.bgHex);
+  const bgColor = new THREE.Color(ATMOSPHERE_PRESETS.dusk.bgHex);
+  scene.background = bgColor;
 
   const keyLight = new THREE.DirectionalLight(0xd0e0f4, 1.54);
   keyLight.position.set(25, 34, 19);
   keyLight.castShadow = true;
-  keyLight.shadow.mapSize.set(2048, 2048);
-  keyLight.shadow.camera.near = 6;
-  keyLight.shadow.camera.far = 112;
-  keyLight.shadow.camera.left = -30;
-  keyLight.shadow.camera.right = 30;
-  keyLight.shadow.camera.top = 30;
-  keyLight.shadow.camera.bottom = -30;
+  keyLight.shadow.mapSize.set(1536, 1536);
+  keyLight.shadow.camera.near = 10;
+  keyLight.shadow.camera.far = 94;
+  keyLight.shadow.camera.left = -24;
+  keyLight.shadow.camera.right = 24;
+  keyLight.shadow.camera.top = 24;
+  keyLight.shadow.camera.bottom = -24;
   keyLight.shadow.bias = -0.0005;
   keyLight.shadow.normalBias = 0.032;
   group.add(keyLight);
@@ -315,7 +317,7 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
   fillLight.position.set(-28, 22, 14);
   group.add(fillLight);
 
-  // Localized warm tungsten & icy-cyan hero street/shop point lights synced with refined urban layout
+  // 6 strategically balanced warm-tungsten & icy-cyan hero PointLights (halving PBR per-pixel light loops!)
   const localLightSpecs: Array<{
     pos: [number, number, number];
     color: number;
@@ -323,30 +325,18 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
     distance: number;
     decay: number;
   }> = [
-    // B1 金鳳冰室 Cha Chaan Teng arcade
-    { pos: [-6.8, 2.3, 6.8], color: 0xffa648, intensity: 14.5, distance: 13.5, decay: 1.55 },
+    // B1 金鳳冰室 Cha Chaan Teng arcade + West streetlamp pocket
+    { pos: [-6.4, 2.75, 7.6], color: 0xffa84e, intensity: 16.0, distance: 15.5, decay: 1.52 },
     // B2 明記雲吞麵 Noodle stall & narrow side-alley warm glow
-    { pos: [-5.8, 2.1, 0.7], color: 0xff9d3c, intensity: 15.2, distance: 13.5, decay: 1.52 },
-    // East plaza MTR Exit A3 canopy + outdoor beverage vending machines (balanced so cans stay crisp!)
-    { pos: [8.4, 2.35, 3.6], color: 0x76e6ff, intensity: 8.6, distance: 11.5, decay: 1.62 },
-    // MTR Exit A3 recessed stairwell warm-white glow (softened so steps & handrails stay legible)
-    { pos: [11.2, 2.15, 2.1], color: 0xffe4b2, intensity: 5.4, distance: 8.5, decay: 1.68 },
+    { pos: [-5.8, 2.25, 0.6], color: 0xff9d3c, intensity: 15.8, distance: 14.5, decay: 1.52 },
+    // East Plaza MTR Exit A3 canopy + outdoor beverage vending alcove (positioned clear of fascia glare!)
+    { pos: [7.85, 1.95, 3.35], color: 0x8ae8ff, intensity: 7.8, distance: 12.0, decay: 1.58 },
     // Far-right B4 24H convenience store behind viaduct (unobstructed hero corner!)
-    { pos: [14.5, 2.3, -5.8], color: 0x82ecff, intensity: 13.2, distance: 13.0, decay: 1.56 },
-    // East plaza green newspaper & flower kiosk + phone booth warm pocket
-    { pos: [10.4, 2.15, 7.4], color: 0xffb85c, intensity: 10.6, distance: 10.5, decay: 1.60 },
-    // Elevated viaduct warm train corridor bounce
-    { pos: [0.6, 5.2, -3.2], color: 0xffb35e, intensity: 8.8, distance: 12.5, decay: 1.65 },
-    // Front-left vintage streetlamp (-5.55, 10.2)
-    { pos: [-5.0, 4.4, 10.2], color: 0xffbd6b, intensity: 8.4, distance: 11.0, decay: 1.68 },
-    // East zebra/vending vintage streetlamp (+5.55, 5.4)
-    { pos: [4.8, 4.4, 5.4], color: 0xffc070, intensity: 7.2, distance: 10.5, decay: 1.70 },
-    // B1 大押 crimson neon warm splash
-    { pos: [-6.6, 5.8, 5.4], color: 0xff6258, intensity: 5.6, distance: 8.5, decay: 1.78 },
-    // B3 / B6 back-left alley warm stairwell bounce under viaduct
-    { pos: [-10.8, 2.4, -7.2], color: 0xffaa4c, intensity: 6.8, distance: 9.5, decay: 1.68 },
-    // East under-viaduct soffit fluorescent wash over Route 101 bus shelter & pier
-    { pos: [9.2, 4.9, -5.0], color: 0xffe4b8, intensity: 7.4, distance: 10.5, decay: 1.66 }
+    { pos: [14.5, 2.3, -5.8], color: 0x82ecff, intensity: 13.4, distance: 13.5, decay: 1.55 },
+    // East plaza green newspaper & flower kiosk + phone booth + east streetlamp warm pocket (clear of tin roof!)
+    { pos: [10.55, 2.15, 7.65], color: 0xffb85e, intensity: 10.8, distance: 12.5, decay: 1.58 },
+    // Elevated viaduct warm train corridor + East under-viaduct Route 101 bus shelter bounce
+    { pos: [3.6, 5.05, -4.1], color: 0xffcf88, intensity: 10.6, distance: 15.5, decay: 1.60 }
   ];
 
   const localLights: Array<{ light: THREE.PointLight; baseIntensity: number }> = [];
@@ -564,6 +554,10 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
       towersGroup.add(crown);
     }
   }
+  towersGroup.traverse((obj) => {
+    obj.updateMatrix();
+    obj.matrixAutoUpdate = false;
+  });
   group.add(towersGroup);
 
   let currentMistOpacityScale = 1.0;
@@ -575,7 +569,7 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
     const cfg = ATMOSPHERE_PRESETS[presetName];
 
     if (!printModeActive) {
-      scene.background = new THREE.Color(cfg.bgHex);
+      bgColor.setHex(cfg.bgHex);
       mistUniforms.uMistColor.value.setHex(cfg.bgHex);
       mistUniforms.uMistEnabled.value = 1.0;
       document.documentElement.style.background = cfg.cssBg;
@@ -616,7 +610,7 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
     printModeActive = enabled;
     const cfg = ATMOSPHERE_PRESETS[activePreset];
     if (enabled) {
-      scene.background = new THREE.Color(0xf4efe6);
+      bgColor.setHex(0xf4efe6);
       mistUniforms.uMistColor.value.setHex(0xf4efe6);
       mistUniforms.uMistEnabled.value = 1.0;
       mistGroup.visible = false;

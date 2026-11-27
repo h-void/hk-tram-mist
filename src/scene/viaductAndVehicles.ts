@@ -4,6 +4,7 @@ import {
   createSoftLightConeMaterial,
   type RadialMistUniforms
 } from './atmosphere';
+import { freezeStaticTransforms, mergeStaticGroupByMaterial } from './perfUtils';
 import {
   createContactShadowTexture,
   createGlowSpriteTexture,
@@ -1506,10 +1507,6 @@ export function createViaductAndVehicles(
   trainSparkSprite.renderOrder = 10;
   trainGroup.add(trainSparkSprite);
 
-  const trainSparkLight = new THREE.PointLight(0x88e8ff, 0, 6.0, 1.75);
-  trainSparkLight.position.set(-3.04, contactY - 0.10, 0);
-  trainGroup.add(trainSparkLight);
-
   // Corrugated Inter-Car Accordion Gangway Bellows
   {
     const gangway = new THREE.Group();
@@ -2535,10 +2532,6 @@ export function createViaductAndVehicles(
   pantoSparkSprite.scale.set(0.85, 0.85, 1);
   pantoSparkSprite.renderOrder = 10;
   tramGroup.add(pantoSparkSprite);
-
-  const pantoSparkLight = new THREE.PointLight(0x88e6ff, 0, 5.5, 1.8);
-  pantoSparkLight.position.set(0.06, 5.22, -0.18);
-  tramGroup.add(pantoSparkLight);
 
   // Rear ruby tail-light wet-asphalt sheen + delicate wet-rail wheel mist spray trailing behind Tram #120
   const tramTailPoolMat = new THREE.MeshBasicMaterial({
@@ -3592,6 +3585,29 @@ export function createViaductAndVehicles(
   minibusGroup.position.set(2.05, 0, 0.70);
   group.add(minibusGroup);
 
+  // Batch static sub-meshes across viaduct, traction poles, and each rigid vehicle chassis!
+  const tramDynamic = new Set<THREE.Object3D>(tramWiperPivot ? [tramWiperPivot] : []);
+  const mbDynamic = new Set<THREE.Object3D>([...mbWheels, ...mbWipers]);
+  const topDynamic = new Set<THREE.Object3D>([tramGroup, trainGroup, taxiGroup, minibusGroup]);
+
+  mergeStaticGroupByMaterial(viaductGroup, { skipTinyInReflection: true, namePrefix: 'ViaductBatch' });
+  freezeStaticTransforms(viaductGroup);
+
+  mergeStaticGroupByMaterial(tramGroup, { excludeRoots: tramDynamic, skipTinyInReflection: true, namePrefix: 'TramBatch' });
+  freezeStaticTransforms(tramGroup, tramDynamic);
+
+  mergeStaticGroupByMaterial(trainGroup, { skipTinyInReflection: true, namePrefix: 'TrainBatch' });
+  freezeStaticTransforms(trainGroup);
+
+  mergeStaticGroupByMaterial(taxiGroup, { skipTinyInReflection: true, namePrefix: 'TaxiBatch' });
+  freezeStaticTransforms(taxiGroup);
+
+  mergeStaticGroupByMaterial(minibusGroup, { excludeRoots: mbDynamic, skipTinyInReflection: true, namePrefix: 'MinibusBatch' });
+  freezeStaticTransforms(minibusGroup, mbDynamic);
+
+  mergeStaticGroupByMaterial(group, { excludeRoots: topDynamic, skipTinyInReflection: true, namePrefix: 'TractionStaticBatch' });
+  freezeStaticTransforms(group, topDynamic);
+
   scene.add(group);
 
   let currentTramZ = 5.65;
@@ -3599,6 +3615,10 @@ export function createViaductAndVehicles(
   let currentMbZ = 0.70;
   let currentEmissiveScale = 1.06;
   let printModeActive = false;
+
+  const tramPosScratch = new THREE.Vector3();
+  const trainPosScratch = new THREE.Vector3();
+  const minibusPosScratch = new THREE.Vector3();
 
   const update = (simTime: number) => {
     // 1. Hero Double-Decker Tram #120 southbound on west track (x = -1.85), 28.0s period synced to 14s traffic signal!
@@ -3622,10 +3642,9 @@ export function createViaductAndVehicles(
         ? Math.sin(((sparkCycle - 0.92) / 0.08) * Math.PI) *
           (0.65 + 0.35 * Math.sin(simTime * 95.0))
         : 0;
-    pantoSparkMat.opacity = sparkBurst * 0.92;
-    const sparkScale = 0.42 + sparkBurst * 0.75;
+    pantoSparkMat.opacity = sparkBurst * 0.95;
+    const sparkScale = 0.46 + sparkBurst * 0.85;
     pantoSparkSprite.scale.set(sparkScale, sparkScale, 1);
-    pantoSparkLight.intensity = sparkBurst * 6.5;
 
     // 2. Elevated Kowloon Metro-Cammell 2-Car Train eastbound on viaduct (z = -3.8)
     const trainRange = 68.0;
@@ -3641,10 +3660,9 @@ export function createViaductAndVehicles(
         ? Math.sin(((tSparkCycle - 0.93) / 0.07) * Math.PI) *
           (0.60 + 0.40 * Math.cos(simTime * 88.0))
         : 0;
-    trainSparkMat.opacity = tSparkBurst * 0.88;
-    const tSparkScale = 0.45 + tSparkBurst * 0.82;
+    trainSparkMat.opacity = tSparkBurst * 0.92;
+    const tSparkScale = 0.50 + tSparkBurst * 0.92;
     trainSparkSprite.scale.set(tSparkScale, tSparkScale, 1);
-    trainSparkLight.intensity = tSparkBurst * 5.8;
 
     // 3. Green-Roof Hong Kong Public Light Bus #28 northbound on east lane (x = +2.05), 28.0s period synced to 14s signal!
     const mbRange = 61.6;
@@ -3690,9 +3708,9 @@ export function createViaductAndVehicles(
     trainGroup,
     taxiGroup,
     minibusGroup,
-    getTramPosition: () => new THREE.Vector3(-1.85, 2.2, currentTramZ),
-    getTrainPosition: () => new THREE.Vector3(currentTrainX, railTopY + 1.2, bridgeZ),
-    getMinibusPosition: () => new THREE.Vector3(2.05, 1.1, currentMbZ),
+    getTramPosition: () => tramPosScratch.set(-1.85, 2.2, currentTramZ),
+    getTrainPosition: () => trainPosScratch.set(currentTrainX, railTopY + 1.2, bridgeZ),
+    getMinibusPosition: () => minibusPosScratch.set(2.05, 1.1, currentMbZ),
     getTramProximity: () => Math.max(0, 1 - Math.abs(currentTramZ - 3.0) / 22.0),
     getTrainProximity: () => Math.max(0, 1 - Math.abs(currentTrainX - 1.0) / 24.0),
     setEmissiveScale: (scale) => {
@@ -3727,9 +3745,7 @@ export function createViaductAndVehicles(
         l.light.intensity = enabled ? 0 : l.baseIntensity * Math.min(1.45, currentEmissiveScale);
       }
       pantoSparkSprite.visible = !enabled;
-      pantoSparkLight.visible = !enabled;
       trainSparkSprite.visible = !enabled;
-      trainSparkLight.visible = !enabled;
       for (const sp of spraySprites) {
         sp.sprite.visible = !enabled;
       }

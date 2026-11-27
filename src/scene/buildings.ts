@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { freezeStaticTransforms, mergeStaticGroupByMaterial } from './perfUtils';
 import {
   createArchedNeonSignTexture,
   createConcreteRoofTexture,
@@ -9,6 +10,8 @@ import {
   createHeritageDatePlaqueTexture,
   createLouvreVentTexture,
   createMtrExitSignTexture,
+  createMtrMosaicTileTexture,
+  createMtrVendingHeaderTexture,
   createNeonSignTexture,
   createPawnshopNeonTexture,
   createRoofTileTexture,
@@ -198,20 +201,39 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
   // REUSABLE ARCHITECTURAL CRAFTSMANSHIP HELPERS
   // =========================================================================
 
+  const rectShadowMatCache = new Map<string, THREE.MeshBasicMaterial>();
   // Grounded contact Ambient Occlusion shadow decal helper
   const addContactShadow = (x: number, z: number, w: number, d: number, opacity = 0.62) => {
-    const mat = new THREE.MeshBasicMaterial({
-      map: rectShadowTex,
-      transparent: true,
-      opacity,
-      depthWrite: false
-    });
+    const key = opacity.toFixed(2);
+    let mat = rectShadowMatCache.get(key);
+    if (!mat) {
+      mat = new THREE.MeshBasicMaterial({
+        map: rectShadowTex,
+        transparent: true,
+        opacity,
+        depthWrite: false
+      });
+      rectShadowMatCache.set(key, mat);
+    }
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w + 1.3, d + 1.3), mat);
     m.rotation.x = -Math.PI / 2;
     m.position.set(x, Y0 + 0.012, z);
     m.renderOrder = 3;
+    m.userData.skipReflection = true;
     group.add(m);
   };
+
+  const terracottaPotMat = new THREE.MeshStandardMaterial({ color: 0xa4543c, roughness: 0.85 });
+  const cagePlantFoliageMat = new THREE.MeshStandardMaterial({ color: 0x3b6e4c, roughness: 0.92 });
+  const laundryClothMats = [0xd66858, 0x6ea6c8, 0xeae2d2, 0x5c9678, 0xe2b85c, 0x9c7ea8].map(
+    (colHex) =>
+      new THREE.MeshStandardMaterial({
+        color: colHex,
+        roughness: 0.88,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+      })
+  );
 
   // Upgraded Hong Kong box window AC unit (窗口式冷氣機) with angled louvers, drip tray & copper coil loop
   const addBoxAC = (parent: THREE.Object3D, x: number, y: number, z: number, rotY = 0) => {
@@ -439,7 +461,6 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
             cfg.hoodMat
           );
           sill.position.set(0, -winH * 0.5 - 0.035, 0.065);
-          sill.castShadow = true;
           markTiny(sill);
           winNode.add(sill);
 
@@ -504,13 +525,13 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
             if (cageSpec.hasPlant) {
               const pot = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.065, 0.048, 0.11, 8),
-                new THREE.MeshStandardMaterial({ color: 0xa4543c, roughness: 0.85 })
+                terracottaPotMat
               );
               pot.position.set(cageW * 0.22, -cageH * 0.5 + 0.07, cageDepth * 0.52);
               cage.add(pot);
               const foliage = new THREE.Mesh(
                 new THREE.DodecahedronGeometry(0.095, 0),
-                new THREE.MeshStandardMaterial({ color: 0x3b6e4c, roughness: 0.92 })
+                cagePlantFoliageMat
               );
               foliage.position.set(cageW * 0.22, -cageH * 0.5 + 0.17, cageDepth * 0.52);
               cage.add(foliage);
@@ -541,16 +562,9 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
 
               const gw = g === 1 ? 0.20 : 0.16;
               const gh = g === 0 ? 0.30 : g === 1 ? 0.26 : 0.22;
-              const colHex = clothColors[(Math.round(poleSpec.phase * 10) + g) % clothColors.length];
-              const clothMat = new THREE.MeshStandardMaterial({
-                color: colHex,
-                roughness: 0.88,
-                metalness: 0.0,
-                side: THREE.DoubleSide
-              });
+              const clothMat = laundryClothMats[(Math.round(poleSpec.phase * 10) + g) % laundryClothMats.length];
               const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.032, gh, gw), clothMat);
               cloth.position.y = -gh * 0.5;
-              cloth.castShadow = true;
               garmentPivot.add(cloth);
 
               poleGroup.add(garmentPivot);
@@ -569,6 +583,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
           // Prevent unused-var lint on winTopY/winBotY (kept for semantic clarity)
           void winTopY;
           void winBotY;
+          void clothColors;
         }
       }
     }
@@ -3420,9 +3435,11 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
   }
 
   // =========================================================================
-  // EAST PLAZA ARCHITECTURAL ANCHOR: HONG KONG MTR / SUBWAY EXIT A3 CANOPY
-  // (灣仔站 A3 出口) + SHELTERED VENDING MACHINE NICHE (x in [6.45, 13.55], z in [0.1, 2.2])
-  // Low-profile (~3.1m) so sightlines to viaduct, train, and B4 remain 100% open!
+  // EAST PLAZA ARCHITECTURAL ANCHOR: HONG KONG MTR / SUBWAY EXIT A3 PAVILION
+  // (灣仔站 A3 出口) + INTEGRATED VENDING ALCOVE (x in [6.40, 13.60], z in [-0.40, 2.20])
+  // Real recessed descending stairwell (pit cut into East sidewalk & ground at x in [9.18, 13.32],
+  // z in [-0.22, 1.94]), downward-sloping stainless handrails, Wan Chai emerald mosaic walls,
+  // solid MTR utility core behind flush vending machines, and unified canopy + fascia!
   // =========================================================================
   {
     const mtrGroup = new THREE.Group();
@@ -3440,149 +3457,372 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       roughness: 0.16,
       metalness: 0.26
     });
+    const mtrMosaicTex = createMtrMosaicTileTexture();
     const mtrTileWallMat = new THREE.MeshStandardMaterial({
-      map: tileDadoTex,
-      color: 0xc2d8d0,
-      roughness: 0.40,
+      map: mtrMosaicTex,
+      roughness: 0.34,
       metalness: 0.08
     });
-    const mtrStairMat = new THREE.MeshStandardMaterial({
-      color: 0x4b5660,
-      roughness: 0.82
+    const mtrStairTreadMat = new THREE.MeshStandardMaterial({
+      color: 0x525d68,
+      roughness: 0.84,
+      metalness: 0.05
     });
-    const mtrGlowCeilingMat = new THREE.MeshStandardMaterial({
-      color: 0xf4e4c4,
-      emissive: new THREE.Color(0xf2cb88),
-      emissiveIntensity: 0.68,
-      roughness: 0.52
+    const mtrNosingMat = new THREE.MeshStandardMaterial({
+      color: 0xe6b832,
+      roughness: 0.50,
+      metalness: 0.08
     });
-    emissiveTracks.push({ mat: mtrGlowCeilingMat, baseIntensity: 0.68 });
+    const mtrTunnelDarkMat = new THREE.MeshStandardMaterial({
+      color: 0x142028,
+      roughness: 0.86
+    });
+    const mtrGlowStripMat = new THREE.MeshStandardMaterial({
+      color: 0xf8ebd0,
+      emissive: new THREE.Color(0xf4cf8e),
+      emissiveIntensity: 0.78,
+      roughness: 0.42
+    });
+    emissiveTracks.push({ mat: mtrGlowStripMat, baseIntensity: 0.78 });
+
+    const mtrVendingLightMat = new THREE.MeshStandardMaterial({
+      color: 0xe2f6fc,
+      emissive: new THREE.Color(0x9ce8f8),
+      emissiveIntensity: 0.72,
+      roughness: 0.36
+    });
+    emissiveTracks.push({ mat: mtrVendingLightMat, baseIntensity: 0.72 });
 
     const mtrSignSet = createMtrExitSignTexture();
     const mtrSignMat = new THREE.MeshStandardMaterial({
       map: mtrSignSet.map,
       emissive: new THREE.Color(0xe6fff8),
       emissiveMap: mtrSignSet.emissiveMap,
-      emissiveIntensity: 1.02,
+      emissiveIntensity: 0.98,
       roughness: 0.32
     });
-    emissiveTracks.push({ mat: mtrSignMat, baseIntensity: 1.02 });
+    emissiveTracks.push({ mat: mtrSignMat, baseIntensity: 0.98 });
 
-    // Contact AO beneath the full MTR exit & vending shelter structure
-    addContactShadow(10.0, 1.15, 7.2, 2.25, 0.56);
+    const mtrVendHeaderSet = createMtrVendingHeaderTexture();
+    const mtrVendHeaderMat = new THREE.MeshStandardMaterial({
+      map: mtrVendHeaderSet.map,
+      emissive: new THREE.Color(0xc8f4ea),
+      emissiveMap: mtrVendHeaderSet.emissiveMap,
+      emissiveIntensity: 0.56,
+      roughness: 0.38
+    });
+    emissiveTracks.push({ mat: mtrVendHeaderMat, baseIntensity: 0.56 });
 
-    // 1. East Wing: Glowing Recessed MTR Subway Stairwell Hood (x in [8.9, 13.5], z in [0.1, 2.15])
-    const sx = 11.2;
-    const sz = 1.12;
-    const sw = 4.6;
-    const sd = 2.02;
+    // Contact AO strictly beneath the solid West utility & vending bay (never covering open stairwell pit!)
+    addContactShadow(7.70, 0.85, 2.60, 2.50, 0.46);
 
-    // Glazed jade-tiled stairwell perimeter parapet walls (North, East, West — open South entrance!)
-    const backWallMtr = new THREE.Mesh(new THREE.BoxGeometry(sw, 1.55, 0.18), mtrTileWallMat);
-    backWallMtr.position.set(sx, Y0 + 0.775, sz - sd * 0.5 + 0.09);
+    // 1. East Bay: Genuine Recessed Descending MTR Subway Stairwell (x in [9.00, 13.50], z in [-0.40, 2.10])
+    const sx = 11.25;
+    const sw = 4.50;
+    const pitMinZ = -0.22;
+    const pitMaxZ = 1.94;
+    const wallTopY = Y0 + 1.24; // 1.40
+    const pitFloorY = Y0 - 0.98; // -0.82
+    const wallBotY = pitFloorY - 0.16; // -0.98
+    const wallH = wallTopY - wallBotY;
+    const wallMidY = (wallTopY + wallBotY) * 0.5;
+    const wallDepthZ = 2.50; // z in [-0.40, 2.10]
+    const wallMidZ = 0.85;
+
+    const mtrStepRiserMat = new THREE.MeshStandardMaterial({
+      color: 0x3b4550,
+      roughness: 0.88,
+      metalness: 0.04
+    });
+
+    // Continuous Wan Chai emerald-mosaic stairwell walls extending cleanly below sidewalk into underground pit
+    const backWallMtr = new THREE.Mesh(new THREE.BoxGeometry(sw, wallH, 0.18), mtrTileWallMat);
+    backWallMtr.position.set(sx, wallMidY, -0.31);
     backWallMtr.castShadow = true;
     backWallMtr.receiveShadow = true;
     mtrGroup.add(backWallMtr);
 
-    for (const sideX of [sx - sw * 0.5 + 0.09, sx + sw * 0.5 - 0.09]) {
-      const sideW = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.32, sd), mtrTileWallMat);
-      sideW.position.set(sideX, Y0 + 0.66, sz);
+    for (const sideX of [9.09, 13.41]) {
+      const sideW = new THREE.Mesh(new THREE.BoxGeometry(0.18, wallH, wallDepthZ), mtrTileWallMat);
+      sideW.position.set(sideX, wallMidY, wallMidZ);
       sideW.castShadow = true;
       sideW.receiveShadow = true;
       mtrGroup.add(sideW);
 
-      const capStone = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, sd + 0.06), coolConcreteMat);
-      capStone.position.set(sideX, Y0 + 1.35, sz);
+      const capStone = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, wallDepthZ + 0.06), coolConcreteMat);
+      capStone.position.set(sideX, wallTopY + 0.04, wallMidZ);
+      capStone.receiveShadow = true;
       mtrGroup.add(capStone);
     }
 
-    // Dark recessed subway descent portal floor + stepped concrete stairs + stainless handrails
+    // Flush granite coping cap along North parapet wall (fitted cleanly between West & East caps — zero z-fight!)
+    const northCap = new THREE.Mesh(new THREE.BoxGeometry(sw - 0.44, 0.08, 0.24), coolConcreteMat);
+    northCap.position.set(sx, wallTopY + 0.04, -0.31);
+    northCap.receiveShadow = true;
+    mtrGroup.add(northCap);
+
+    // Subterranean bottom concourse landing floor
     const wellFloor = new THREE.Mesh(
-      new THREE.BoxGeometry(sw - 0.36, 0.06, sd - 0.24),
-      new THREE.MeshStandardMaterial({ color: 0x16222a, roughness: 0.75 })
+      new THREE.BoxGeometry(sw - 0.34, 0.16, pitMaxZ - pitMinZ + 0.08),
+      mtrTunnelDarkMat
     );
-    wellFloor.position.set(sx, Y0 + 0.03, sz + 0.02);
+    wellFloor.position.set(sx, pitFloorY - 0.08, (pitMinZ + pitMaxZ) * 0.5);
+    wellFloor.receiveShadow = true;
     mtrGroup.add(wellFloor);
 
-    // Illuminated recessed subway concourse portal glow on inner north wall
-    const portalGlow = new THREE.Mesh(new THREE.PlaneGeometry(sw - 0.80, 1.18), mtrGlowCeilingMat);
-    portalGlow.position.set(sx, Y0 + 0.74, sz - sd * 0.5 + 0.20);
-    mtrGroup.add(portalGlow);
+    // Brushed stainless rain-drainage floor grating channel across top threshold (z = 1.99)
+    const drainGrate = new THREE.Mesh(new THREE.BoxGeometry(sw - 0.38, 0.016, 0.10), brushedAluminumMat);
+    drainGrate.position.set(sx, Y0 + 0.008, 1.99);
+    markTiny(drainGrate);
+    mtrGroup.add(drainGrate);
 
-    // 4 Descending concrete steps with yellow anti-slip nosing strips
-    for (let st = 0; st < 4; st++) {
-      const stepH = 0.05 + (3 - st) * 0.035;
-      const step = new THREE.Mesh(new THREE.BoxGeometry(sw - 0.44, stepH, 0.34), mtrStairMat);
-      step.position.set(sx, Y0 + stepH * 0.5, sz + 0.74 - st * 0.36);
-      markTiny(step);
+    // Leading yellow anti-slip safety nosing along top sidewalk edge (z = 1.92)
+    const topNosing = new THREE.Mesh(new THREE.BoxGeometry(sw - 0.38, 0.014, 0.042), mtrNosingMat);
+    topNosing.position.set(sx, Y0 + 0.007, pitMaxZ - 0.02);
+    markTiny(topNosing);
+    mtrGroup.add(topNosing);
+
+    // 7 Real Descending Concrete Subway Steps at 24.0 deg pitch (clearly readable from SE iso & Print Mode!)
+    const stepCount = 7;
+    const stepDrop = 0.125;
+    const stepRun = 0.28;
+    const stepW = sw - 0.36; // 4.14m exact pit width
+    mtrStairTreadMat.color.setHex(0x697682);
+    for (let st = 0; st < stepCount; st++) {
+      const stepTopY = Y0 - (st + 1) * stepDrop;
+      const stepBlockH = Math.max(0.06, stepTopY - pitFloorY);
+      const stepCenterZ = pitMaxZ - (st + 0.5) * stepRun;
+
+      const step = new THREE.Mesh(
+        new THREE.BoxGeometry(stepW, stepBlockH, stepRun + 0.004),
+        [
+          mtrStepRiserMat,
+          mtrStepRiserMat,
+          mtrStairTreadMat,
+          mtrStepRiserMat,
+          mtrStepRiserMat,
+          mtrStepRiserMat
+        ]
+      );
+      step.position.set(sx, pitFloorY + stepBlockH * 0.5, stepCenterZ);
+      step.receiveShadow = true;
       mtrGroup.add(step);
+
+      // Crisp HK yellow anti-slip nosing strip along each step's descending north edge
+      const nosing = new THREE.Mesh(new THREE.BoxGeometry(stepW - 0.04, 0.014, 0.042), mtrNosingMat);
+      nosing.position.set(sx, stepTopY + 0.007, pitMaxZ - (st + 1) * stepRun + 0.024);
+      markTiny(nosing);
+      mtrGroup.add(nosing);
     }
 
-    // Center & side brushed stainless-steel subway handrails
-    for (const rx of [sx - 1.98, sx, sx + 1.98]) {
-      const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1.65, 8), stainlessMat);
-      rail.rotation.x = Math.PI / 2 + 0.14;
-      rail.position.set(rx, Y0 + 0.86, sz + 0.12);
-      markTiny(rail);
-      mtrGroup.add(rail);
-      for (const pz of [sz - 0.55, sz + 0.82]) {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.88, 6), stainlessMat);
-        post.position.set(rx, Y0 + 0.44, pz);
-        markTiny(post);
-        mtrGroup.add(post);
+    // Recessed subterranean concourse tunnel aperture on lower inner North wall (y in [-0.82, +0.28])
+    const portalH = 1.10;
+    const portalW = 3.66;
+    const portalRecess = new THREE.Mesh(new THREE.BoxGeometry(portalW, portalH, 0.06), mtrTunnelDarkMat);
+    portalRecess.position.set(sx, pitFloorY + portalH * 0.5, pitMinZ + 0.03);
+    mtrGroup.add(portalRecess);
+
+    // Brushed aluminum subterranean lintel beam framing the underground concourse opening
+    const portalLintel = new THREE.Mesh(new THREE.BoxGeometry(portalW + 0.16, 0.10, 0.10), brushedAluminumMat);
+    portalLintel.position.set(sx, pitFloorY + portalH + 0.04, pitMinZ + 0.05);
+    markTiny(portalLintel);
+    mtrGroup.add(portalLintel);
+
+    // Subtle warm-white recessed linear fluorescent strip tucked inside underground tunnel ceiling
+    const tunnelCeilingLight = new THREE.Mesh(new THREE.BoxGeometry(portalW - 0.36, 0.05, 0.14), mtrGlowStripMat);
+    tunnelCeilingLight.position.set(sx, pitFloorY + portalH - 0.06, pitMinZ + 0.09);
+    markTiny(tunnelCeilingLight);
+    mtrGroup.add(tunnelCeilingLight);
+
+    // Properly Engineered Downward-Sloping Brushed Stainless-Steel MTR Handrails (100% exact 24° pitch & post fit!)
+    const railTopZ = 1.90;
+    const railBotZ = pitMaxZ - stepCount * stepRun; // -0.02
+    const railTopY = Y0 + 0.78;
+    const railBotY = Y0 - stepCount * stepDrop + 0.78; // +0.065
+    const getRailY = (pz: number): number => {
+      if (pz >= railTopZ) return railTopY;
+      const u = Math.min(1, Math.max(0, (railTopZ - pz) / (railTopZ - railBotZ)));
+      return railTopY + u * (railBotY - railTopY);
+    };
+    const getStepFloorY = (pz: number): number => {
+      if (pz >= pitMaxZ) return Y0;
+      const idx = Math.min(stepCount, Math.max(1, Math.floor((pitMaxZ - pz) / stepRun) + 1));
+      return Y0 - idx * stepDrop;
+    };
+
+    const makeMtrHandrail = (rx: number, wallSide: -1 | 0 | 1) => {
+      const railCurve = new THREE.CurvePath<THREE.Vector3>();
+      const pEntry = new THREE.Vector3(rx, railTopY, 2.04);
+      const pBend = new THREE.Vector3(rx, railTopY, railTopZ);
+      const pBot = new THREE.Vector3(rx, railBotY, railBotZ);
+      railCurve.add(new THREE.LineCurve3(pEntry, pBend));
+      railCurve.add(new THREE.LineCurve3(pBend, pBot));
+
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(railCurve, 12, 0.022, 8, false), stainlessMat);
+      markTiny(tube);
+      mtrGroup.add(tube);
+
+      // Smooth rounded endcap spheres at entry & bottom
+      for (const ep of [pEntry, pBot]) {
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.023, 8, 6), stainlessMat);
+        cap.position.copy(ep);
+        markTiny(cap);
+        mtrGroup.add(cap);
       }
-    }
 
-    // Structural dark-green steel canopy columns (supporting continuous hood over Exit A3 + Vending Niche!)
-    for (const [px, pz] of [
-      [6.55, 1.48],
-      [8.95, 2.02],
-      [13.45, 2.02],
-      [8.95, 0.22],
-      [13.45, 0.22]
-    ]) {
-      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.076, 2.65, 10), mtrGreenSteelMat);
-      col.position.set(px, Y0 + 1.325, pz);
-      col.castShadow = true;
-      mtrGroup.add(col);
-    }
+      if (wallSide === 0) {
+        // Center divider rail: 3 exact vertical stanchion posts sitting flush on treads & stopping AT rail center
+        for (const pz of [2.00, 1.08, 0.14]) {
+          const yLo = getStepFloorY(pz);
+          const yHi = getRailY(pz);
+          const h = Math.max(0.1, yHi - yLo);
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.020, 0.022, h, 8), stainlessMat);
+          post.position.set(rx, yLo + h * 0.5, pz);
+          markTiny(post);
+          mtrGroup.add(post);
 
-    // Sloped dark-green framed & glass-skylight MTR canopy roof spanning Exit A3 + Vending Niche
-    const mtrCanopyFrame = new THREE.Mesh(new THREE.BoxGeometry(7.35, 0.12, 2.55), mtrGreenSteelMat);
-    mtrCanopyFrame.position.set(10.0, Y0 + 2.84, 1.18);
-    mtrCanopyFrame.rotation.x = 0.08;
+          const baseFlange = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.048, 0.018, 8), stainlessMat);
+          baseFlange.position.set(rx, yLo + 0.009, pz);
+          markTiny(baseFlange);
+          mtrGroup.add(baseFlange);
+        }
+      } else {
+        // Side wall-mounted handrails: 3 sleek horizontal stainless wall brackets into the jade-tiled stairwell walls
+        const wallInnerX = wallSide < 0 ? 9.18 : 13.32;
+        const bracketLen = Math.abs(rx - wallInnerX);
+        const bracketMidX = (rx + wallInnerX) * 0.5;
+        for (const pz of [1.96, 1.06, 0.14]) {
+          const ry = getRailY(pz);
+          const br = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, bracketLen, 6), stainlessMat);
+          br.rotation.z = Math.PI / 2;
+          br.position.set(bracketMidX, ry, pz);
+          markTiny(br);
+          mtrGroup.add(br);
+        }
+      }
+    };
+
+    makeMtrHandrail(9.27, -1);   // West wall-mounted handrail
+    makeMtrHandrail(sx, 0);      // Center divider handrail
+    makeMtrHandrail(13.23, 1);   // East wall-mounted handrail
+
+    // 2. Unified Sloped MTR Steel-and-Glass Canopy Roof + Exact-Fit Structural Columns
+    // Pitched gently DOWN toward rear (-Z) so rainwater drains into rear gutter and front fascia tucks cleanly beneath!
+    const canopyCenterX = 10.00;
+    const canopyCenterY = Y0 + 2.88;
+    const canopyCenterZ = 0.92;
+    const canopyTilt = -0.055; // front (+Z) higher, back (-Z) lower
+    const getCanopyBottomY = (pz: number): number =>
+      canopyCenterY + (pz - canopyCenterZ) * Math.tan(-canopyTilt) - 0.06;
+
+    const mtrCanopyFrame = new THREE.Mesh(new THREE.BoxGeometry(7.40, 0.12, 2.96), mtrGreenSteelMat);
+    mtrCanopyFrame.position.set(canopyCenterX, canopyCenterY, canopyCenterZ);
+    mtrCanopyFrame.rotation.x = canopyTilt;
     mtrCanopyFrame.castShadow = true;
+    mtrCanopyFrame.receiveShadow = true;
     mtrGroup.add(mtrCanopyFrame);
 
-    const mtrSkylight = new THREE.Mesh(new THREE.BoxGeometry(6.75, 0.06, 1.92), mtrCanopyGlassMat);
-    mtrSkylight.position.set(10.0, Y0 + 2.90, 1.18);
-    mtrSkylight.rotation.x = 0.08;
+    const mtrSkylight = new THREE.Mesh(new THREE.BoxGeometry(6.84, 0.05, 2.34), mtrCanopyGlassMat);
+    mtrSkylight.position.set(canopyCenterX, canopyCenterY + 0.06, canopyCenterZ);
+    mtrSkylight.rotation.x = canopyTilt;
     markTiny(mtrSkylight);
     mtrGroup.add(mtrSkylight);
 
-    // Warm glowing linear LED soffit light bar underneath the MTR canopy
-    const mtrSoffitBar = new THREE.Mesh(new THREE.BoxGeometry(4.10, 0.05, 0.22), mtrGlowCeilingMat);
-    mtrSoffitBar.position.set(sx, Y0 + 2.68, sz + 0.10);
+    // 5 slender dark-green steel transverse roof skylight mullions
+    for (let mi = -2; mi <= 2; mi++) {
+      const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.065, 2.38), mtrGreenSteelMat);
+      mullion.position.set(canopyCenterX + mi * 1.35, canopyCenterY + 0.065, canopyCenterZ);
+      mullion.rotation.x = canopyTilt;
+      markTiny(mullion);
+      mtrGroup.add(mullion);
+    }
+
+    // Rear aluminum rainwater collector gutter along back eave (z = -0.56)
+    const rearGutter = new THREE.Mesh(new THREE.BoxGeometry(7.42, 0.08, 0.10), darkSteelMat);
+    rearGutter.position.set(canopyCenterX, getCanopyBottomY(-0.56) + 0.02, -0.57);
+    markTiny(rearGutter);
+    mtrGroup.add(rearGutter);
+
+    // 6 Exact-Fit Structural Dark-Green Steel Canopy Columns (zero clipping through parapet walls, zero roof gaps!)
+    const columnSpecs: Array<[number, number, number]> = [
+      [6.50, 2.12, Y0],            // Front-left corner supporting West vending canopy overhang
+      [6.50, -0.30, Y0],           // Back-left corner
+      [9.09, 2.02, wallTopY + 0.07],  // Center-front rising cleanly off west parapet cap
+      [9.09, -0.30, wallTopY + 0.07], // Center-back rising cleanly off west parapet cap
+      [13.41, 2.02, wallTopY + 0.07], // East-front rising cleanly off east parapet cap
+      [13.41, -0.30, wallTopY + 0.07] // East-back rising cleanly off east parapet cap
+    ];
+    for (const [px, pz, baseY] of columnSpecs) {
+      const topY = getCanopyBottomY(pz) + 0.02;
+      const colH = Math.max(0.2, topY - baseY);
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.064, 0.070, colH, 10), mtrGreenSteelMat);
+      col.position.set(px, baseY + colH * 0.5, pz);
+      col.castShadow = true;
+      mtrGroup.add(col);
+
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.105, 0.05, 10), darkSteelMat);
+      collar.position.set(px, baseY + 0.025, pz);
+      markTiny(collar);
+      mtrGroup.add(collar);
+    }
+
+    // Warm recessed linear LED soffit light bar underneath the MTR stairwell canopy
+    const mtrSoffitBar = new THREE.Mesh(new THREE.BoxGeometry(4.00, 0.045, 0.20), mtrGlowStripMat);
+    mtrSoffitBar.position.set(sx, getCanopyBottomY(0.95) - 0.02, 0.95);
     markTiny(mtrSoffitBar);
     mtrGroup.add(mtrSoffitBar);
 
-    // Iconic Backlit Fascia Signboard facing +Z: 灣仔站 · 出口 WAN CHAI STATION A3 (4.36 × 0.75, exact AR 5.81!)
+    // Subtle cool-white alcove soffit light strip above the 2 vending machines
+    const vmSoffitBar = new THREE.Mesh(new THREE.BoxGeometry(2.10, 0.04, 0.14), mtrVendingLightMat);
+    vmSoffitBar.position.set(7.70, getCanopyBottomY(1.68) - 0.02, 1.68);
+    markTiny(vmSoffitBar);
+    mtrGroup.add(vmSoffitBar);
+
+    // 3. Unified Full-Width Front Architectural Fascia tucked cleanly BELOW canopy front overhang!
+    // Right wing (x in [9.02, 13.48]): 灣仔站 · 出口 WAN CHAI STATION A3 backlit lightbox
+    const fasciaY = Y0 + 2.48; // top = Y0 + 2.82, cleanly beneath canopy underside Y0 + 2.887!
+    const fasciaZ = 2.14;
     const mtrFascia = new THREE.Mesh(
-      new THREE.BoxGeometry(4.36, 0.75, 0.16),
+      new THREE.BoxGeometry(4.46, 0.68, 0.16),
       [mtrGreenSteelMat, mtrGreenSteelMat, mtrGreenSteelMat, mtrGreenSteelMat, mtrSignMat, mtrGreenSteelMat]
     );
-    mtrFascia.position.set(sx, Y0 + 2.48, 2.16);
+    mtrFascia.position.set(sx, fasciaY, fasciaZ);
     mtrFascia.castShadow = true;
     mtrGroup.add(mtrFascia);
 
-    // 2. West Wing: Tiled Architectural Backing Wall for the 2 Outdoor Vending Machines!
-    const vmBackWall = new THREE.Mesh(new THREE.BoxGeometry(2.52, 2.38, 0.18), mtrTileWallMat);
-    vmBackWall.position.set(7.65, Y0 + 1.19, 1.48);
-    vmBackWall.castShadow = true;
-    vmBackWall.receiveShadow = true;
-    mtrGroup.add(vmBackWall);
+    // Left wing (x in [6.42, 9.02]): Matching dark emerald-teal Vending Alcove header panel flush with Exit A3 sign!
+    const vmFascia = new THREE.Mesh(
+      new THREE.BoxGeometry(2.60, 0.68, 0.16),
+      [mtrGreenSteelMat, mtrGreenSteelMat, mtrGreenSteelMat, mtrGreenSteelMat, mtrVendHeaderMat, mtrGreenSteelMat]
+    );
+    vmFascia.position.set(7.72, fasciaY, fasciaZ);
+    vmFascia.castShadow = true;
+    mtrGroup.add(vmFascia);
 
-    // 3. Upgraded Non-Blown-Out Crisp Hong Kong Beverage Vending Machines nestled cleanly against the tiled wall!
+    // 4. West Bay: Solid Integrated MTR Ventilation / Utility Core (x in [6.40, 9.00], z in [-0.40, 1.26])
+    // Extends seamlessly all the way up to canopy soffit — ZERO dead gap behind vending machines!
+    const utilH = getCanopyBottomY(-0.36) - Y0 + 0.02;
+    const utilCore = new THREE.Mesh(
+      new THREE.BoxGeometry(2.60, utilH, 1.66),
+      [mtrGreenSteelMat, mtrGreenSteelMat, mtrGreenSteelMat, mtrGreenSteelMat, mtrTileWallMat, mtrGreenSteelMat]
+    );
+    utilCore.position.set(7.70, Y0 + utilH * 0.5, 0.43);
+    utilCore.castShadow = true;
+    utilCore.receiveShadow = true;
+    mtrGroup.add(utilCore);
+
+    // Architectural recessed ventilation louver grilles on west (-X) & north (-Z) sides of MTR utility core
+    const westVent = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.24, 1.12), louvreMat);
+    westVent.position.set(6.39, Y0 + 1.56, 0.43);
+    markTiny(westVent);
+    mtrGroup.add(westVent);
+
+    const northVent = new THREE.Mesh(new THREE.BoxGeometry(1.78, 1.18, 0.04), louvreMat);
+    northVent.position.set(7.70, Y0 + 1.56, -0.41);
+    markTiny(northVent);
+    mtrGroup.add(northVent);
+
+    // 5. Crisp Hong Kong Beverage Vending Machines recessed cleanly flush inside the sheltered West Alcove!
     const vmSetA = createVendingMachineTextureSet('teal');
     const vmSetB = createVendingMachineTextureSet('crimson');
     const vmTealSideMat = new THREE.MeshStandardMaterial({ color: 0x265264, roughness: 0.44, metalness: 0.30 });
@@ -3603,8 +3843,8 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       sideMat: THREE.MeshStandardMaterial;
       emissive: number;
     }> = [
-      { x: 7.05, z: 1.98, texSet: vmSetA, sideMat: vmTealSideMat, emissive: 0x8aeaff },
-      { x: 8.20, z: 1.98, texSet: vmSetB, sideMat: vmCrimSideMat, emissive: 0xaef0ff }
+      { x: 7.16, z: 1.62, texSet: vmSetA, sideMat: vmTealSideMat, emissive: 0x8aeaff },
+      { x: 8.24, z: 1.62, texSet: vmSetB, sideMat: vmCrimSideMat, emissive: 0xaef0ff }
     ];
 
     for (const vm of vmSpecs) {
@@ -3620,7 +3860,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       });
       emissiveTracks.push({ mat: vmFrontMat, baseIntensity: 0.62 });
 
-      // Main cabinet body flush against MTR tiled wall
+      // Main cabinet body sitting flush against the MTR jade-tiled alcove back wall (z = 1.26)
       const body = new THREE.Mesh(
         new THREE.BoxGeometry(0.90, 1.76, 0.66),
         [vm.sideMat, vm.sideMat, vm.sideMat, vm.sideMat, vmFrontMat, vm.sideMat]
@@ -3686,7 +3926,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       }
 
       mtrGroup.add(vmGrp);
-      addContactShadow(vm.x, vm.z, 0.88, 0.72, 0.44);
+      addContactShadow(vm.x, vm.z + 0.08, 0.86, 0.68, 0.40);
     }
 
     group.add(mtrGroup);
@@ -3995,6 +4235,26 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     addRoofWhirlybird(14.55, Y0 + 10.30, -9.65, 3.1, 2.9);
   }
 
+  // Batch static sub-meshes globally across all buildings (sharing steel, concrete, pipe, AC, glass & shadow batches)
+  const dynamicBuildingRoots = new Set<THREE.Object3D>([
+    ...laundryTracks.map((l) => l.obj),
+    ...spinTracks.map((s) => s.obj)
+  ]);
+  for (const s of spinTracks) {
+    mergeStaticGroupByMaterial(s.obj, { skipTinyInReflection: true, namePrefix: 'SpinRotorBatch' });
+  }
+  mergeStaticGroupByMaterial(group, {
+    excludeRoots: dynamicBuildingRoots,
+    skipTinyInReflection: true,
+    namePrefix: 'BuildingsStaticBatch'
+  });
+  freezeStaticTransforms(group, dynamicBuildingRoots);
+
+  const flickerTracks = emissiveTracks.filter(
+    (t): t is EmissiveTrack & { flickerPhase: number; flickerAmp: number } =>
+      t.flickerPhase !== undefined && Boolean(t.flickerAmp)
+  );
+
   scene.add(group);
 
   let currentEmissiveScale = 1.15;
@@ -4028,19 +4288,18 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
   };
 
   const update = (simTime: number) => {
-    for (const track of emissiveTracks) {
-      if (track.flickerPhase !== undefined && track.flickerAmp) {
-        // Gentle authentic neon ballast shimmer + rare micro-flutter
-        const wave = Math.sin(simTime * 3.2 + track.flickerPhase) * 0.035;
-        const flutter =
-          Math.pow(Math.max(0, Math.sin(simTime * 1.1 + track.flickerPhase * 2.3)), 18) *
-          Math.sin(simTime * 42.0) *
-          track.flickerAmp;
-        track.mat.emissiveIntensity = Math.max(
-          0.2,
-          track.baseIntensity * currentEmissiveScale * (1.0 + wave - Math.abs(flutter))
-        );
-      }
+    for (let i = 0; i < flickerTracks.length; i++) {
+      const track = flickerTracks[i];
+      // Gentle authentic neon ballast shimmer + rare micro-flutter
+      const wave = Math.sin(simTime * 3.2 + track.flickerPhase) * 0.035;
+      const flutter =
+        Math.pow(Math.max(0, Math.sin(simTime * 1.1 + track.flickerPhase * 2.3)), 18) *
+        Math.sin(simTime * 42.0) *
+        track.flickerAmp;
+      track.mat.emissiveIntensity = Math.max(
+        0.2,
+        track.baseIntensity * currentEmissiveScale * (1.0 + wave - Math.abs(flutter))
+      );
     }
 
     // Humid monsoon mist glow breathing softly around projecting neon signs
