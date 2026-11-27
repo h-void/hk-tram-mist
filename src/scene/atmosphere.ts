@@ -89,7 +89,7 @@ export function applyRadialMistFade(
     material.transparent = true;
   }
 
-  // uMistInnerR / uMistOuterR are runtime uniforms, so only fadeAlpha changes shader code!
+  // uMistInnerR / uMistOuterR are runtime uniforms, so only fadeAlpha changes shader code
   const cacheKey = `hk_radial_mist_${fadeAlpha ? 'a' : 'c'}`;
   material.customProgramCacheKey = () => cacheKey;
 
@@ -312,12 +312,12 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
   const hemiLight = new THREE.HemisphereLight(0xa4bcd2, 0x3b4c5c, 1.06);
   group.add(hemiLight);
 
-  // Side-rim fill positioned perpendicular to the SE camera axis (avoiding mirror specular glare on wet road!)
+  // Side-rim fill positioned perpendicular to the SE camera axis (avoiding mirror specular glare on wet road)
   const fillLight = new THREE.DirectionalLight(0x7a96b4, 0.44);
   fillLight.position.set(-28, 22, 14);
   group.add(fillLight);
 
-  // 6 strategically balanced warm-tungsten & icy-cyan hero PointLights (halving PBR per-pixel light loops!)
+  // 6 warm-tungsten & icy-cyan PointLights (halving PBR per-pixel light loops)
   const localLightSpecs: Array<{
     pos: [number, number, number];
     color: number;
@@ -329,11 +329,11 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
     { pos: [-6.4, 2.75, 7.6], color: 0xffa84e, intensity: 16.0, distance: 15.5, decay: 1.52 },
     // B2 明記雲吞麵 Noodle stall & narrow side-alley warm glow
     { pos: [-5.8, 2.25, 0.6], color: 0xff9d3c, intensity: 15.8, distance: 14.5, decay: 1.52 },
-    // East Plaza MTR Exit A3 canopy + outdoor beverage vending alcove (positioned clear of fascia glare!)
+    // East Plaza MTR Exit A3 canopy + outdoor beverage vending alcove (positioned clear of fascia glare)
     { pos: [7.85, 1.95, 3.35], color: 0x8ae8ff, intensity: 7.8, distance: 12.0, decay: 1.58 },
-    // Far-right B4 24H convenience store behind viaduct (unobstructed hero corner!)
+    // Far-right B4 24H convenience store behind viaduct (unobstructed corner)
     { pos: [14.5, 2.3, -5.8], color: 0x82ecff, intensity: 13.4, distance: 13.5, decay: 1.55 },
-    // East plaza green newspaper & flower kiosk + phone booth + east streetlamp warm pocket (clear of tin roof!)
+    // East plaza green newspaper & flower kiosk + phone booth + east streetlamp warm pocket (clear of tin roof)
     { pos: [10.55, 2.15, 7.65], color: 0xffb85e, intensity: 10.8, distance: 12.5, decay: 1.58 },
     // Elevated viaduct warm train corridor + East under-viaduct Route 101 bus shelter bounce
     { pos: [3.6, 5.05, -4.1], color: 0xffcf88, intensity: 10.6, distance: 15.5, decay: 1.60 }
@@ -347,7 +347,7 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
     localLights.push({ light: pt, baseIntensity: spec.intensity });
   }
 
-  // 36 Layered Drifting Volumetric Mist Clouds (strict circular alpha texture -> ZERO quad seams!)
+  // 36 Layered Drifting Volumetric Mist Clouds (strict circular alpha texture -> no quad seams)
   const mistGroup = new THREE.Group();
   mistGroup.name = 'DriftingMistClouds';
   const cloudTexA = createMistCloudTexture(2026);
@@ -427,7 +427,7 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
     [21.5, 2.8, 5.2, 15.0, 6.8, 0.16],
     [-2.8, 12.2, -23.0, 20.5, 9.2, 0.20],
     [23.5, 7.8, -13.5, 16.5, 8.0, 0.19],
-    // Delicate monsoon street-canyon wisps drifting behind the viaduct piers (depth separation!)
+    // Delicate monsoon street-canyon wisps drifting behind the viaduct piers (depth separation)
     [0.4, 3.1, -6.2, 11.5, 4.4, 0.11],
     [-8.6, 3.6, -5.8, 9.8, 4.0, 0.10]
   ];
@@ -438,7 +438,7 @@ export function createAtmosphere(scene: THREE.Scene): AtmosphereSystem {
   group.add(mistGroup);
 
   // Distant Hong Kong Horizon Skyline Silhouettes:
-  // Depth-tested opaque far backdrop strictly behind the north horizon so ZERO overlapping transparent seams appear!
+  // Depth-tested opaque far backdrop strictly behind the north horizon so no overlapping transparent seams appear
   const towersGroup = new THREE.Group();
   towersGroup.name = 'DistantGhostTowers';
 

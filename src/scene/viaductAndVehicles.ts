@@ -352,7 +352,7 @@ function createParkingPadTexture(): THREE.CanvasTexture {
     ctx.fillRect(W * 0.24, 44, 44, H - 88);
     ctx.fillRect(W * 0.64, 44, 44, H - 88);
 
-    // Crisp weathered white painted parking stall boundary box
+    // weathered white painted parking stall boundary box
     ctx.strokeStyle = 'rgba(232, 238, 244, 0.78)';
     ctx.lineWidth = 9;
     ctx.strokeRect(24, 24, W - 48, H - 48);
@@ -628,7 +628,7 @@ export function createViaductAndVehicles(
     viaductGroup.add(checkRail);
   }
 
-  // Concrete Viaduct Piers straddling road cleanly at ±6.5 and outer flanks -17.2 / +18.9 (unobstructed B4 24H mart!)
+  // Concrete Viaduct Piers straddling road cleanly at ±6.5 and outer flanks -17.2 / +18.9 (unobstructed B4 24H mart)
   const pierXs = [-17.2, -6.5, 6.5, 18.9];
   const pierShadowMat = new THREE.MeshBasicMaterial({
     map: shadowTex,
@@ -799,7 +799,7 @@ export function createViaductAndVehicles(
   dropperInst.instanceMatrix.needsUpdate = true;
   viaductGroup.add(dropperInst);
 
-  // Glowing Trackside Hong Kong Railway Signal Post (hooded dark steel head with emerald-green & red lamps!)
+  // Glowing Trackside Hong Kong Railway Signal Post (hooded dark steel head with emerald-green & red lamps)
   {
     const sigGroup = new THREE.Group();
     sigGroup.name = 'HK_RailwaySignalPost';
@@ -850,7 +850,7 @@ export function createViaductAndVehicles(
     }
     sigGroup.add(ladderGroup);
 
-    // Signal ID plate KT-14 (+X/-X wide faces 0.42 × 0.21, AR = 2.000 exact match, dark steel thin edges!)
+    // Signal ID plate KT-14 (+X/-X wide faces 0.42 × 0.21, AR = 2.000 exact match, dark steel thin edges)
     const plateMat = new THREE.MeshStandardMaterial({
       map: createSignalPlateTexture(),
       roughness: 0.45
@@ -931,7 +931,7 @@ export function createViaductAndVehicles(
   // =========================================================================
   // 2. ANIMATED 2-CAR RETRO HK METRO-CAMMELL ELEVATED TRAIN (z = -3.8, y = 7.12)
   // Sculpted beveled-roof profile, stainless side flutes, 3D sliding doors,
-  // angled cab windshield + wipers, amber LED destination & diamond pantograph!
+  // angled cab windshield + wipers, amber LED destination & diamond pantograph
   // =========================================================================
   const vehicleFade = { innerR: 18.0, outerR: 27.0 };
 
@@ -1069,7 +1069,7 @@ export function createViaductAndVehicles(
   const carLen = 5.66;
   const carW = 1.86;
   const halfW = carW * 0.5;
-  // ExtrudeGeometry bevelSize = 0.025 extends outer side wall to halfW + 0.025!
+  // ExtrudeGeometry bevelSize = 0.025 extends outer side wall to halfW + 0.025
   const shellBevel = 0.025;
   const outerZ = halfW + shellBevel;
 
@@ -1115,7 +1115,7 @@ export function createViaductAndVehicles(
     car.add(roofCrownCap);
 
     // 2. Real 3D Recessed Glowing Warm Amber Passenger Windows, Recessed Sliding Doors,
-    // Crimson Roof/Waist Stripes & 3D Stainless Flutes cleanly OUTSIDE outerZ (zero shell clipping!)
+    // Crimson Roof/Waist Stripes & 3D Stainless Flutes cleanly OUTSIDE outerZ (zero shell clipping)
     const innerLen = carLen - 0.32;
     const secW = innerLen / 6;
 
@@ -1175,7 +1175,7 @@ export function createViaductAndVehicles(
           stepPlate.position.set(0, -0.72, side * 0.015);
           doorMicro.add(stepPlate);
 
-          // Twin glowing warm amber upper glass panes inside the sliding door leaves!
+          // Twin glowing warm amber upper glass panes inside the sliding door leaves
           for (const dxOff of [-doorW * 0.24, doorW * 0.24]) {
             const bezel = new THREE.Mesh(new THREE.BoxGeometry(doorW * 0.38, 0.68, 0.026), trainRubberMat);
             bezel.position.set(dxOff, 0.16, side * 0.008);
@@ -1193,7 +1193,7 @@ export function createViaductAndVehicles(
           doorGroup.add(doorMicro);
           car.add(doorGroup);
         } else {
-          // Real 3D recessed glowing warm amber wide passenger window bay!
+          // Real 3D recessed glowing warm amber wide passenger window bay
           const winW = secW - 0.12;
           const winH = 0.78;
           const winY = 1.46;
@@ -1207,7 +1207,7 @@ export function createViaductAndVehicles(
           if (side === -1) glass.rotation.y = Math.PI;
           car.add(glass);
 
-          // Crisp horizontal silver upper hopper window sash rail
+          // horizontal silver upper hopper window sash rail
           const sashRail = markSkipPrintEdges(
             new THREE.Mesh(new THREE.BoxGeometry(winW + 0.02, 0.028, 0.022), trainSilverMat)
           );
@@ -1242,7 +1242,7 @@ export function createViaductAndVehicles(
           spring.position.set(ax * 0.56, 0.26, side * 0.73);
           bogieMicro.add(spring);
 
-          // Flanged steel wheel seated on railTopY (y = 0 in car space!)
+          // Flanged steel wheel seated on railTopY (y = 0 in car space)
           const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.075, 12), railSteelMat);
           wheel.rotation.x = Math.PI / 2;
           wheel.position.set(ax, 0.19, side * 0.56);
@@ -1294,7 +1294,7 @@ export function createViaductAndVehicles(
       }
     }
 
-    // 5. Crisp 3D Diamond Pantograph on Ribbed Ceramic Insulators (Rear Car)
+    // 5. 3D Diamond Pantograph on Ribbed Ceramic Insulators (Rear Car)
     if (!isFront) {
       const pantoGroup = new THREE.Group();
       const pantoBaseY = 2.40;
@@ -1400,7 +1400,7 @@ export function createViaductAndVehicles(
       car.add(wiper);
     }
 
-    // Glowing Amber LED Cab Destination Board (觀塘 KWUN TONG) above windshield!
+    // Glowing Amber LED Cab Destination Board (觀塘 KWUN TONG) above windshield
     const ledHousing = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.24, 1.06), trainUnderMat);
     ledHousing.position.set(noseX + noseDir * 0.08, 2.08, 0);
     car.add(ledHousing);
@@ -1435,7 +1435,7 @@ export function createViaductAndVehicles(
         hl.position.set(noseX + 0.105, 0.86, hz);
         car.add(hl);
 
-        // Ultra-soft Fresnel+axial volumetric headlight mist beam (ZERO hard rim!)
+        // Soft Fresnel+axial volumetric headlight mist beam (no hard rim)
         const coneMat = createSoftLightConeMaterial(0xffdc92, 0.068);
         softCones.push({ mat: coneMat, baseOpacity: 0.068 });
         const cone = new THREE.Mesh(new THREE.ConeGeometry(0.95, 5.8, 24, 1, true), coneMat);
@@ -1445,7 +1445,7 @@ export function createViaductAndVehicles(
         car.add(cone);
       }
 
-      // Natural elongated dual-rail headlight wet-glint along the elevated tracks (eliminates bright oval blob!)
+      // Natural elongated dual-rail headlight wet-glint along the elevated tracks (eliminates bright oval blob)
       const trackSpillMat = new THREE.MeshBasicMaterial({
         map: glowTex,
         color: 0xffd688,
@@ -1461,7 +1461,7 @@ export function createViaductAndVehicles(
       trackSpill.renderOrder = 5;
       car.add(trackSpill);
 
-      // Crisp paired specular wet steel-rail glint streaks ahead of the twin headlamps
+      // paired specular wet steel-rail glint streaks ahead of the twin headlamps
       const railGlintMat = new THREE.MeshBasicMaterial({
         map: glowTex,
         color: 0xffe8b8,
@@ -1492,7 +1492,7 @@ export function createViaductAndVehicles(
   trainGroup.add(buildMetroCar(3.04, true));
   trainGroup.add(buildMetroCar(-3.04, false));
 
-  // Periodic wet-catenary electric-cyan micro-spark at rear Metro-Cammell diamond pantograph!
+  // Periodic wet-catenary electric-cyan micro-spark at rear Metro-Cammell diamond pantograph
   const trainSparkMat = new THREE.SpriteMaterial({
     map: glowTex,
     color: 0xa4f0ff,
@@ -1583,11 +1583,11 @@ export function createViaductAndVehicles(
   }
 
   // =========================================================================
-  // 4. HERO DOUBLE-DECKER HONG KONG TRAM (叮叮車 #120) on x = -1.85, heading +Z!
+  // 4. Double-decker Hong Kong tram (叮叮車 #120) on x = -1.85, heading +Z
   // True multi-part scale-model coach: chamfered emerald waist, real 3D recessed
   // window bays over glowing 3D interior cabin (benches, brass poles, staircase,
   // 3D seated passengers), vaulted barrel-arch roof, cowcatcher fender, detailed
-  // Brill 21E bogie truck, and brass bow pantograph riding y = 5.30 trolley wire!
+  // Brill 21E bogie truck, and brass bow pantograph riding y = 5.30 trolley wire
   // =========================================================================
   const tramGroup = new THREE.Group();
   tramGroup.name = 'HK_DoubleDecker_Tram_120';
@@ -1663,7 +1663,7 @@ export function createViaductAndVehicles(
   });
   applyRadialMistFade(tramNumPlateMat, mistUniforms, vehicleFade);
 
-  // Warm illuminated interior surfaces balanced so 3D teak benches, brass poles & passengers read crisply!
+  // Warm illuminated interior surfaces balanced so 3D teak benches, brass poles & passengers read crisply
   const tramCabinWarmWallMat = new THREE.MeshStandardMaterial({
     color: 0xe6c38c,
     emissive: new THREE.Color(0xffaa44),
@@ -1843,7 +1843,7 @@ export function createViaductAndVehicles(
     return geom;
   };
 
-  // Lower emerald-green waist skirt (y = 0.50..1.18) with rounded chamfered HK tram corners!
+  // Lower emerald-green waist skirt (y = 0.50..1.18) with rounded chamfered HK tram corners
   const lowerSkirt = new THREE.Mesh(
     createChamferedDeckGeometry(tramW, tramL, 0.68, 0.16),
     tramEmeraldMat
@@ -1944,7 +1944,7 @@ export function createViaductAndVehicles(
     upperLightStrip.position.y = 3.80;
     cabinDetail.add(upperLightStrip);
 
-    // Subtle warm backlit center aisle divider ribs (gives rich warm depth visible from every angle!)
+    // Subtle warm backlit center aisle divider ribs (gives rich warm depth visible from every angle)
     const warmBackdropLower = new THREE.Mesh(
       new THREE.BoxGeometry(0.08, 0.92, tramL - 1.5),
       tramCabinWarmWallMat
@@ -1963,7 +1963,7 @@ export function createViaductAndVehicles(
       cabinDetail.add(lowBack);
     }
 
-    // Upper deck transverse wooden bench rows (5 rows on both sides of the central aisle!)
+    // Upper deck transverse wooden bench rows (5 rows on both sides of the central aisle)
     const upperBenchZs = [-1.42, -0.70, 0.02, 0.74, 1.46];
     for (const bz of upperBenchZs) {
       for (const side of [-1, 1]) {
@@ -1990,7 +1990,7 @@ export function createViaductAndVehicles(
       }
     }
 
-    // Rear curved staircase hint (z = -2.18, spiraling treads + curved brass handrail!)
+    // Rear curved staircase hint (z = -2.18, spiraling treads + curved brass handrail)
     for (let st = 0; st < 7; st++) {
       const ang = (st / 6) * Math.PI * 0.72;
       const tread = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.05, 0.19), tramTeakMat);
@@ -2015,7 +2015,7 @@ export function createViaductAndVehicles(
     ctrlHandle.position.set(-0.22, 1.30, 2.34);
     cabinDetail.add(ctrlHandle);
 
-    // 3D Seated Miniature Passenger Silhouettes (Upper & Lower Decks) + Tram Driver!
+    // 3D Seated Miniature Passenger Silhouettes (Upper & Lower Decks) + Tram Driver
     const addSeatedPassenger = (px: number, py: number, pz: number, matIdx: number) => {
       const torso = new THREE.Mesh(
         new THREE.CylinderGeometry(0.095, 0.135, 0.34, 8),
@@ -2036,7 +2036,7 @@ export function createViaductAndVehicles(
       cabinDetail.add(hair);
     };
 
-    // Upper deck seated passengers (clearly visible through 3D recessed window bays!)
+    // Upper deck seated passengers (clearly visible through 3D recessed window bays)
     addSeatedPassenger(0.36, 2.98, 1.46, 0);
     addSeatedPassenger(-0.36, 2.98, 1.46, 1);
     addSeatedPassenger(0.38, 2.98, 0.74, 2);
@@ -2055,7 +2055,7 @@ export function createViaductAndVehicles(
     tramGroup.add(cabin);
   }
 
-  // --- 4D. Real 3D Recessed Window Bays along BOTH Sides (+X and -X) ---
+  // --- 4D. Real 3D Recessed Window Bays along both Sides (+X and -X) ---
   {
     const bayCount = 6;
     const bayStartZ = -2.02;
@@ -2193,7 +2193,7 @@ export function createViaductAndVehicles(
       tramGroup.add(bar);
     }
 
-    // 3D Projecting Destination Rollsign Box (跑馬地 HAPPY VALLEY) with curved rain hood canopy!
+    // 3D Projecting Destination Rollsign Box (跑馬地 HAPPY VALLEY) with curved rain hood canopy
     const destBox = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.31, 0.15), tramDarkGreenMat);
     destBox.position.set(0, 3.88, ez + endDir * 0.07);
     tramGroup.add(destBox);
@@ -2241,7 +2241,7 @@ export function createViaductAndVehicles(
     tramGroup.add(bumperTrim);
   }
 
-  // Iconic Single Centered Vintage Brass Headlamp (+Z front) with Curved Upper Visor + Soft Volumetric Beam
+  // Single Centered Vintage Brass Headlamp (+Z front) with Curved Upper Visor + Soft Volumetric Beam
   let tramWiperPivot: THREE.Group | null = null;
   {
     const hz = halfTL + 0.05;
@@ -2272,7 +2272,7 @@ export function createViaductAndVehicles(
     lampVisor.position.set(0, 0.96, hz + 0.14);
     tramGroup.add(lampVisor);
 
-    // Front brass driver windshield wiper (articulated pivot at lower sill for live rain-sweep animation!)
+    // Front brass driver windshield wiper (articulated pivot at lower sill for live rain-sweep animation)
     tramWiperPivot = markSkipPrintEdges(new THREE.Group());
     tramWiperPivot.position.set(-0.22, 1.38, halfTL + 0.015);
     const tramWiperArm = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.36, 0.018), trainUnderMat);
@@ -2303,7 +2303,7 @@ export function createViaductAndVehicles(
     }
   }
 
-  // Ultra-soft Fresnel+axial misty tram headlight cone (ZERO hard silhouette!)
+  // Soft Fresnel+axial misty tram headlight cone (no hard silhouette)
   const tramBeamMat = createSoftLightConeMaterial(0xffd788, 0.072);
   softCones.push({ mat: tramBeamMat, baseOpacity: 0.072 });
   const tramBeam = new THREE.Mesh(new THREE.ConeGeometry(1.25, 5.4, 24, 1, true), tramBeamMat);
@@ -2422,7 +2422,7 @@ export function createViaductAndVehicles(
   }
 
   // --- 4G. Detailed Brass Bow Pantograph (集電弓) with Insulators, Springs & Twin Contact Strips ---
-  // Rides cleanly on y = trolleyY (5.30), well below viaduct soffit y = 6.20!
+  // Rides cleanly on y = trolleyY (5.30), well below viaduct soffit y = 6.20
   {
     const panto = new THREE.Group();
     const baseY = 4.24;
@@ -2501,7 +2501,7 @@ export function createViaductAndVehicles(
       tramBrassMat
     );
 
-    // Twin parallel brass contact collector strips + upturned end horns riding trolley wire!
+    // Twin parallel brass contact collector strips + upturned end horns riding trolley wire
     for (const cz of [-0.045, 0.045]) {
       const contactStrip = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.028, 0.032), tramBrassMat);
       contactStrip.position.set(0, topY, topZ + cz);
@@ -2587,7 +2587,7 @@ export function createViaductAndVehicles(
   // 5. CLASSIC RED HONG KONG TAXI (紅的 Toyota Crown Comfort)
   // True sculpted 3-box sedan profile (ExtrudeGeometry), sloped A/C-pillars &
   // windshields, twin front-fender wing mirrors, recessed wheel arches, chrome
-  // grille + amber signals + rear cluster lamps, glowing FOR HIRE flag & TAXI sign!
+  // grille + amber signals + rear cluster lamps, glowing FOR HIRE flag & TAXI sign
   // =========================================================================
   const taxiGroup = new THREE.Group();
   taxiGroup.name = 'HK_Red_Taxi';
@@ -2666,7 +2666,7 @@ export function createViaductAndVehicles(
   applyRadialMistFade(taxiSignMat, mistUniforms, vehicleFade);
   emissiveTracks.push({ mat: taxiSignMat, base: 1.55 });
 
-  // Plain glowing warm-amber plastic end caps for taxi roof sign (±X square ends — zero crushed text!)
+  // Plain glowing warm-amber plastic end caps for taxi roof sign (±X square ends — zero crushed text)
   const taxiSignEndMat = new THREE.MeshStandardMaterial({
     color: 0xf6c95a,
     emissive: new THREE.Color(0xffbf38),
@@ -2702,7 +2702,7 @@ export function createViaductAndVehicles(
   taxiGroup.add(taxiAO);
 
   // 1. Sculpted Crimson Lower 3-Box Sedan Body (ExtrudeGeometry side profile in ZY, extruded along X)
-  // Note: -Z is front nose facing zebra crossing, +Z is rear trunk facing camera!
+  // Note: -Z is front nose facing zebra crossing, +Z is rear trunk facing camera
   {
     const lowerProfile = new THREE.Shape();
     lowerProfile.moveTo(-1.60, 0.27);
@@ -2782,7 +2782,7 @@ export function createViaductAndVehicles(
     rearWind.rotation.x = -0.68;
     taxiGroup.add(rearWind);
 
-    // Glowing red/amber FOR HIRE / 有客 flag perched inside the slanted front windshield (6-mat: zero edge smear!)
+    // Glowing red/amber FOR HIRE / 有客 flag perched inside the slanted front windshield (6-mat: zero edge smear)
     const hireFlag = markSkipPrintEdges(
       new THREE.Mesh(
         new THREE.BoxGeometry(0.24, 0.13, 0.025),
@@ -2840,7 +2840,7 @@ export function createViaductAndVehicles(
         taxiGroup.add(handle);
       }
 
-      // SIGNATURE HONG KONG CROWN COMFORT DETAIL: Twin Front-Fender Mounted Wing Mirrors!
+      // SIGNATURE HONG KONG CROWN COMFORT DETAIL: Twin Front-Fender Mounted Wing Mirrors
       const mirrorGroup = markSkipPrintEdges(new THREE.Group());
       mirrorGroup.position.set(side * 0.62, 0.74, -1.24);
       const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.12, 6), trainRubberMat);
@@ -3002,7 +3002,7 @@ export function createViaductAndVehicles(
   taxiGroup.add(taxiTailPool);
 
   // =========================================================================
-  // 5B. AUTHENTIC HONG KONG METERED KERBSIDE TAXI PARKING BAY (泊車位 + P 牌 + 圍欄)
+  // 5B. Hong Kong METERED KERBSIDE TAXI PARKING BAY (泊車位 + P 牌 + 圍欄)
   // Echoing the foreground parking lot in IMG_1635: x in [5.8, 9.2], z in [9.4, 13.8]
   // =========================================================================
   {
@@ -3035,7 +3035,7 @@ export function createViaductAndVehicles(
     });
     applyRadialMistFade(bayCurbMat, mistUniforms, viaductFade);
 
-    // Wet dark-asphalt concrete parking pad with painted white stall outline (+Y top face only!)
+    // Wet dark-asphalt concrete parking pad with painted white stall outline (+Y top face only)
     const pad = new THREE.Mesh(
       new THREE.BoxGeometry(bayW, 0.024, bayD),
       [bayCurbMat, bayCurbMat, bayPadMat, bayCurbMat, bayCurbMat, bayCurbMat]
@@ -3057,7 +3057,7 @@ export function createViaductAndVehicles(
     bayGroup.add(wheelStop);
 
     // Low 3-sided dark-iron perimeter fence enclosing North (z=9.4), East (x=9.2), and South (z=13.8)
-    // leaving West (x=5.8) driveway open to the wet avenue!
+    // leaving West (x=5.8) driveway open to the wet avenue
     const fenceH = 0.68;
     const addFenceRun = (x0: number, z0: number, x1: number, z1: number, posts: number) => {
       const dx = x1 - x0;
@@ -3158,7 +3158,7 @@ export function createViaductAndVehicles(
 
   // =========================================================================
   // 6. ICONIC HONG KONG 16-SEAT GREEN-ROOF PUBLIC LIGHT BUS (綠頂專線小巴 28 · 銅鑼灣)
-  // Glides northbound (-Z) along the open East lane (x = +2.05) opposite Tram #120!
+  // Glides northbound (-Z) along the open East lane (x = +2.05) opposite Tram #120
   // =========================================================================
   const minibusGroup = new THREE.Group();
   minibusGroup.name = 'HK_GreenRoof_Minibus_28';
@@ -3258,7 +3258,7 @@ export function createViaductAndVehicles(
   mbLower.receiveShadow = true;
   minibusGroup.add(mbLower);
 
-  // Signature emerald-green lower wrap-around rear waist stripe + HK yellow rear license plate on +Z tailgate!
+  // Signature emerald-green lower wrap-around rear waist stripe + HK yellow rear license plate on +Z tailgate
   const mbRearStripe = markSkipPrintEdges(new THREE.Mesh(new THREE.BoxGeometry(mbW + 0.01, 0.22, 0.02), mbGreenRoofMat));
   mbRearStripe.position.set(0, 0.96, mbHalfL + 0.006);
   minibusGroup.add(mbRearStripe);
@@ -3277,7 +3277,7 @@ export function createViaductAndVehicles(
   mbRearPlate.position.set(0, 0.58, mbHalfL + 0.015);
   minibusGroup.add(mbRearPlate);
 
-  // Warm illuminated passenger interior core + dark passenger silhouettes visible through panoramic windows!
+  // Warm illuminated passenger interior core + dark passenger silhouettes visible through panoramic windows
   const mbInnerCore = markSkipPrintEdges(new THREE.Mesh(new THREE.BoxGeometry(mbW - 0.26, 0.68, mbL - 0.52), mbCabinGlowMat));
   mbInnerCore.position.set(0, 1.54, 0.04);
   minibusGroup.add(mbInnerCore);
@@ -3336,7 +3336,7 @@ export function createViaductAndVehicles(
   mbStepLight.position.set(mbHalfW - 0.01, 0.42, -1.48);
   minibusGroup.add(mbStepLight);
 
-  // Iconic Hong Kong ceiling-mounted Minibus Speedometer LED box ("58 km/h") inside cabin!
+  // Hong Kong ceiling-mounted Minibus Speedometer LED box ("58 km/h") inside cabin
   const mbSpeedoCanvas = document.createElement('canvas');
   mbSpeedoCanvas.width = 128;
   mbSpeedoCanvas.height = 64;
@@ -3378,7 +3378,7 @@ export function createViaductAndVehicles(
   mbSpeedoBox.position.set(0, 1.82, -1.42);
   minibusGroup.add(mbSpeedoBox);
 
-  // Signature Hong Kong Emerald-Green Vaulted Roof Cap + Sculpted AC Pod with Twin Cooling Fans + Clearance Lamps!
+  // Signature Hong Kong Emerald-Green Vaulted Roof Cap + Sculpted AC Pod with Twin Cooling Fans + Clearance Lamps
   const mbRoof = new THREE.Mesh(new THREE.BoxGeometry(mbW + 0.02, 0.24, mbL - 0.06), mbGreenRoofMat);
   mbRoof.position.set(0, 2.04, 0);
   mbRoof.castShadow = true;
@@ -3423,7 +3423,7 @@ export function createViaductAndVehicles(
     minibusGroup.add(rearMarker);
   }
 
-  // Iconic Backlit "28 銅鑼灣 CAUSEWAY BAY" Placards on front windshield (-Z) & rear glass (+Z, visible from Hero camera!)
+  // Backlit "28 銅鑼灣 CAUSEWAY BAY" Placards on front windshield (-Z) & rear glass (+Z, visible from camera)
   const mbPlacard = new THREE.Mesh(
     new THREE.BoxGeometry(0.84, 0.28, 0.04),
     [mbGreenRoofMat, mbGreenRoofMat, mbGreenRoofMat, mbGreenRoofMat, mbPlacardMat, mbPlacardMat]
@@ -3585,7 +3585,7 @@ export function createViaductAndVehicles(
   minibusGroup.position.set(2.05, 0, 0.70);
   group.add(minibusGroup);
 
-  // Batch static sub-meshes across viaduct, traction poles, and each rigid vehicle chassis!
+  // Batch static sub-meshes across viaduct, traction poles, and each rigid vehicle chassis
   const tramDynamic = new Set<THREE.Object3D>(tramWiperPivot ? [tramWiperPivot] : []);
   const mbDynamic = new Set<THREE.Object3D>([...mbWheels, ...mbWipers]);
   const topDynamic = new Set<THREE.Object3D>([tramGroup, trainGroup, taxiGroup, minibusGroup]);
@@ -3621,7 +3621,7 @@ export function createViaductAndVehicles(
   const minibusPosScratch = new THREE.Vector3();
 
   const update = (simTime: number) => {
-    // 1. Hero Double-Decker Tram #120 southbound on west track (x = -1.85), 28.0s period synced to 14s traffic signal!
+    // 1. Double-decker Tram #120 southbound on west track (x = -1.85), 28.0s period synced to 14s traffic signal
     const tramRange = 56.0;
     const tramSpeed = 2.0;
     const tramOffset = ((5.65 + 28.0 + simTime * tramSpeed) % tramRange + tramRange) % tramRange;
@@ -3664,7 +3664,7 @@ export function createViaductAndVehicles(
     const tSparkScale = 0.50 + tSparkBurst * 0.92;
     trainSparkSprite.scale.set(tSparkScale, tSparkScale, 1);
 
-    // 3. Green-Roof Hong Kong Public Light Bus #28 northbound on east lane (x = +2.05), 28.0s period synced to 14s signal!
+    // 3. Green-Roof Hong Kong Public Light Bus #28 northbound on east lane (x = +2.05), 28.0s period synced to 14s signal
     const mbRange = 61.6;
     const mbSpeed = -2.2;
     const mbOffset = ((0.70 + 30.8 + simTime * mbSpeed) % mbRange + mbRange) % mbRange;

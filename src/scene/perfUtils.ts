@@ -322,7 +322,7 @@ export function mergeStaticGroupByMaterial(
   let batchIdx = 0;
 
   for (const bucket of buckets.values()) {
-    // Keep standalone single-material singletons untouched (still stamp skipReflection if micro-detail!)
+    // Keep standalone single-material singletons untouched (still stamp skipReflection if micro-detail)
     if (bucket.entries.length === 1 && !bucket.hasMultiMaterialSource) {
       const only = bucket.entries[0];
       if (bucket.skipReflection) {

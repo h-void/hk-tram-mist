@@ -107,7 +107,7 @@ function createAcousticWaveMaterial(colorHex: number, initialOpacity = 0.5): THR
         vec2 p = vUv * 2.0 - 1.0;
         float r = length(p);
         if (r > 1.0 || r < 0.34) discard;
-        // Crisp glowing primary wavefront crest at r = 0.90 + harmonic trailing echo at r = 0.72 & 0.55
+        // glowing primary wavefront crest at r = 0.90 + harmonic trailing echo at r = 0.72 & 0.55
         float d1 = (r - 0.90) / 0.056;
         float d2 = (r - 0.72) / 0.066;
         float d3 = (r - 0.55) / 0.076;
@@ -215,7 +215,7 @@ export function createWeatherAndEffects(
   const rand = mulberry32(202608);
 
   // =========================================================================
-  // 1. DELICATE TAPERED GLSL DIAGONAL RAIN STREAKS (~620 silky streaks, 100% GPU vertex animated!)
+  // 1. Tapered GLSL diagonal rain streaks (~620 streaks, GPU vertex animated)
   // =========================================================================
   const RAIN_COUNT = 620;
   const rainOrigins = new Float32Array(RAIN_COUNT * 2 * 3);
@@ -297,7 +297,7 @@ export function createWeatherAndEffects(
   group.add(rainLines);
 
   // =========================================================================
-  // 2. SOFT CONCENTRIC EXPANDING WET PUDDLE RIPPLES (collected for single GPU InstancedMesh!)
+  // 2. Concentric expanding wet puddle ripples (collected for single GPU InstancedMesh)
   // =========================================================================
   const rippleTex = createRippleTexture();
   const roadRippleSpecs: Array<{
@@ -500,7 +500,7 @@ export function createWeatherAndEffects(
 
   group.add(acousticGroup);
 
-  // Interactive Tram Bell ("叮叮!") Double-Ding Golden Wavefront Pool (visible in BOTH Diorama & Acoustic modes!)
+  // Interactive Tram Bell ("叮叮") Double-Ding Golden Wavefront Pool (visible in both Diorama & Acoustic modes)
   const bellBurstGroup = new THREE.Group();
   bellBurstGroup.name = 'TramBellWaveBursts';
   group.add(bellBurstGroup);
@@ -648,7 +648,7 @@ export function createWeatherAndEffects(
   eaveDripsInst.renderOrder = 8;
   group.add(eaveDripsInst);
 
-  // Synchronized GPU-animated Instanced Ripple Mesh (34 road puddle ripples + 20 eave drip impact ripples = 1 draw call!)
+  // Synchronized GPU-animated Instanced Ripple Mesh (34 road puddle ripples + 20 eave drip impact ripples = 1 draw call)
   const allRippleSpecs = [
     ...roadRippleSpecs,
     ...dripSeeds.map((d) => ({
@@ -760,7 +760,7 @@ export function createWeatherAndEffects(
   group.add(allRipplesMesh);
 
   // =========================================================================
-  // 5. [P] ARCHIVAL AXONOMETRIC PRINT MODE (Xuan Paper #F4EFE6 + Prussian/Pine/Cinnabar Ink)
+  // 5. [P] Axonometric line-art print mode (Matte Paper #F4EFE6 + Prussian/Pine/Cinnabar Ink)
   // =========================================================================
   const savedMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
   const savedVisibility = new Map<THREE.Object3D, boolean>();
@@ -795,7 +795,7 @@ export function createWeatherAndEffects(
     polygonOffsetFactor: 2,
     polygonOffsetUnits: 2
   });
-  // Whisper-delicate botanical Xuan-paper washes for Hong Kong Bauhinia & Weeping Banyan canopies
+  // Whisper-delicate botanical matte paper washes for Hong Kong Bauhinia & Weeping Banyan canopies
   const xuanBauhiniaMat = new THREE.MeshBasicMaterial({
     color: 0xeddcd7,
     polygonOffset: true,
@@ -865,7 +865,7 @@ export function createWeatherAndEffects(
       root.traverse((obj) => {
         if (!(obj instanceof THREE.Mesh)) return;
 
-        // Override ExtendedGroundPlane to pure spotless Xuan paper (#F4EFE6) without edges!
+        // Override ExtendedGroundPlane to pure matte paper (#F4EFE6) without edges
         if (obj.name === 'ExtendedGroundPlane') {
           printMaterialTargets.push({ mesh: obj, printMat: xuanPaperMat });
           return;
@@ -1251,7 +1251,7 @@ export function createWeatherAndEffects(
       }
     }
 
-    // Emit pine soot first, then Prussian blue, then cinnabar hero accent on top
+    // Emit pine soot first, then Prussian blue, then cinnabar accent on top
     const orderRank = (k: string) => (k.startsWith('pine') ? 0 : k.startsWith('prussian') ? 1 : 2);
     const sortedKeys = Array.from(buckets.keys()).sort((a, b) => {
       const dr = orderRank(a) - orderRank(b);
@@ -1306,7 +1306,7 @@ export function createWeatherAndEffects(
     trainPos: THREE.Vector3,
     minibusPos: THREE.Vector3
   ) => {
-    // 1 & 2. GPU-driven diagonal rain streaks & all 54 instanced road/drip ripples (0 CPU loops, 0 VBO uploads!)
+    // 1 & 2. GPU-driven diagonal rain streaks & all 54 instanced road/drip ripples (0 CPU loops, 0 VBO uploads)
     if (rainLines.visible) {
       rainMat.uniforms.uTime.value = simTime;
     }
@@ -1374,7 +1374,7 @@ export function createWeatherAndEffects(
       }
     }
 
-    // 3D. Update falling eave rain drips (landing impact ripples are synchronized on GPU in allRipplesMesh!)
+    // 3D. Update falling eave rain drips (landing impact ripples are synchronized on GPU in allRipplesMesh)
     if (eaveDripsInst.visible) {
       for (let i = 0; i < dripSeeds.length; i++) {
         const d = dripSeeds[i];
@@ -1430,7 +1430,7 @@ export function createWeatherAndEffects(
         mw.mat.uniforms.uOpacity.value = (1 - u) * 0.52;
       }
 
-      // Hong Kong pedestrian audible crossing signal emerald wavefronts synced to authentic 14s HK clock!
+      // Hong Kong pedestrian audible crossing signal emerald wavefronts synced to 14s HK clock
       const crossingActive = sig.crossingAudioActive;
       const crossingRate = sig.crossingAudioUrgent ? 2.8 : 1.15;
       for (const cw of crossingBeepRings) {
@@ -1455,7 +1455,7 @@ export function createWeatherAndEffects(
       }
     }
 
-    // 5. Update Interactive Tram Bell Double-Ding & Horn Wavefront Pulses ("叮-叮!")
+    // 5. Update Interactive Tram Bell Double-Ding & Horn Wavefront Pulses ("叮-叮")
     for (let i = activeBellPulses.length - 1; i >= 0; i--) {
       const bp = activeBellPulses[i];
       const dtA = simTime - bp.startTime;

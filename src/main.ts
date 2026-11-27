@@ -486,7 +486,7 @@ function bootScene(): void {
     }
   });
 
-  // 7. Pointer Raycasting for Clicking & Frame-Throttled Hovering on Hero Vehicles
+  // 7. Pointer Raycasting for Clicking & Frame-Throttled Hovering on Vehicles
   const raycaster = new THREE.Raycaster();
   const pointerNDC = new THREE.Vector2();
   let pointerDownPos = { x: 0, y: 0 };

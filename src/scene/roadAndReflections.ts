@@ -46,7 +46,7 @@ function createWetSidewalkRoughnessTexture(): THREE.CanvasTexture {
   ctx.fillStyle = 'rgb(204, 204, 204)';
   ctx.fillRect(0, 0, S, S);
 
-  // Subtle flagstone tile-to-tile roughness variation strictly in [164, 232] -> [0.50, 0.71] effective!
+  // Subtle flagstone tile-to-tile roughness variation strictly in [164, 232] -> [0.50, 0.71] effective
   const tile = 64;
   for (let ty = 0; ty < S; ty += tile) {
     for (let tx = 0; tx < S; tx += tile) {
@@ -259,7 +259,7 @@ class PlanarWetReflector extends THREE.Mesh {
           vec2 jitter = vec2((w1 + w2 * 0.5) * 0.0008 + g1 * 0.0008, (w2 - w1 * 0.4) * 0.0010)
                       + ripples * vec2(0.0036, 0.0046);
 
-          // 9-tap anisotropic wet-asphalt vertical streak filter (silky rain-slicked neon ribbons!)
+          // 9-tap anisotropic wet-asphalt vertical streak filter (rain-slicked neon ribbons)
           vec2 stepY = vec2(0.0, 0.0044);
           vec2 stepX = vec2(0.0018, 0.0);
           vec3 col = texture2D(tDiffuse, clamp(uv + jitter, 0.002, 0.998)).rgb * 0.24;
@@ -484,7 +484,7 @@ export function createRoadAndReflections(
   hiddenDuringReflection.push(roadMesh);
 
   // 3. Road markings layer (y = 0.032): Zebra Crossing (斑馬線 z=+3.4), Yellow Box (黃格 z=+0.2),
-  // Iconic HK LOOK LEFT / LOOK RIGHT stencils, Double-Yellow Curb Lines, Drainage Grates & Manholes
+  // HK LOOK LEFT / LOOK RIGHT stencils, Double-Yellow Curb Lines, Drainage Grates & Manholes
   const markingsGroup = new THREE.Group();
   markingsGroup.name = 'RoadMarkingsGroup';
 
@@ -520,7 +520,7 @@ export function createRoadAndReflections(
   yellowBoxMesh.renderOrder = 3;
   markingsGroup.add(yellowBoxMesh);
 
-  // Iconic Hong Kong tarmac pedestrian safety stencils (望左 LOOK LEFT / 望右 LOOK RIGHT)
+  // Hong Kong tarmac pedestrian safety stencils (望左 LOOK LEFT / 望右 LOOK RIGHT)
   const stencilLeftMat = new THREE.MeshStandardMaterial({
     map: createRoadStencilTexture('left'),
     transparent: true,
@@ -584,7 +584,7 @@ export function createRoadAndReflections(
     markingsGroup.add(mh);
   }
 
-  // Signature Hong Kong painted Double Yellow No-Parking Lines (雙黃線) along BOTH curbs (x = ±4.80 & ±4.93)
+  // Signature Hong Kong painted Double Yellow No-Parking Lines (雙黃線) along both curbs (x = ±4.80 & ±4.93)
   const doubleYellowTex = createDoubleYellowPaintTexture();
   const doubleYellowMat = new THREE.MeshStandardMaterial({
     map: doubleYellowTex,
@@ -670,7 +670,7 @@ export function createRoadAndReflections(
   addPuddleGlow(11.25, 3.25, 4.2, 2.2, 0xffe0a8, 0.14, 0.175);
   // Warm amber damp-granite spill outside east plaza newspaper kiosk (9.4, 7.4) & phone booth
   addPuddleGlow(8.7, 8.2, 4.4, 3.8, 0xffb250, 0.19, 0.175);
-  // Crisp cyan wet sheen outside far-right B4 24H convenience store (15.4, -9.6)
+  // cyan wet sheen outside far-right B4 24H convenience store (15.4, -9.6)
   addPuddleGlow(14.6, -5.6, 5.6, 3.8, 0x72e6ff, 0.20, 0.175);
   // Soft under-viaduct soffit fluorescent wash onto wet road & east Route 101 bus shelter pavement
   addPuddleGlow(0.0, -3.8, 7.2, 3.6, 0xffe2b4, 0.13);
@@ -714,7 +714,7 @@ export function createRoadAndReflections(
   reflector.name = 'PlanarWetRoadReflector';
   group.add(reflector);
 
-  // 6. Twin Recessed Glistening Steel Tram Rails (x = -1.85 southbound hero track and x = +1.85 northbound track)
+  // 6. Twin Recessed Glistening Steel Tram Rails (x = -1.85 southbound track and x = +1.85 northbound track)
   const railsGroup = new THREE.Group();
   railsGroup.name = 'TramRailsGroup';
 
@@ -907,7 +907,7 @@ export function createRoadAndReflections(
     makeBlisterPad(-5.60, 3.4, 0.68, 1.48); // Zebra crossing tactile warning pad
     makeBlisterPad(-5.68, 7.0, 0.56, 1.32); // Tram stop boarding warning pad
 
-    // East sidewalk guide path along x = +6.15 -> seamless L-turn into full-width MTR Exit A3 stairwell pad!
+    // East sidewalk guide path along x = +6.15 -> L-turn into full-width MTR Exit A3 stairwell pad
     makeStripMesh(6.15, 3.4, 0.32, 12.2, false);
     makeBlisterPad(5.60, 3.4, 0.68, 1.48); // East zebra crossing tactile warning pad
     makeStripMesh(8.68, 3.4, 4.76, 0.32, true); // East branch along z=3.4 from x=6.30 to x=11.06

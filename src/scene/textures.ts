@@ -437,7 +437,7 @@ export function createFacadeTextureSet(cfg: FacadeConfig): FacadeTextureSet {
         ectx.fillStyle = eGrad;
         ectx.fillRect(wx, wy, winW, winH);
 
-        // Interior room side-wall perspective depth shading (gives 3D interior recession!)
+        // Interior room side-wall perspective depth shading (gives 3D interior recession)
         const sideShadowL = ctx.createLinearGradient(wx, 0, wx + winW * 0.22, 0);
         sideShadowL.addColorStop(0, 'rgba(24, 14, 10, 0.42)');
         sideShadowL.addColorStop(1, 'rgba(24, 14, 10, 0)');
@@ -545,7 +545,7 @@ export function createFacadeTextureSet(cfg: FacadeConfig): FacadeTextureSet {
           }
         }
 
-        // Crisp Venetian blinds across upper half
+        // Venetian blinds across upper half
         if (rand() > 0.42) {
           ctx.fillStyle = 'rgba(24, 18, 16, 0.34)';
           ectx.fillStyle = 'rgba(0, 0, 0, 0.42)';
@@ -592,7 +592,7 @@ export function createFacadeTextureSet(cfg: FacadeConfig): FacadeTextureSet {
         ctx.fill();
       }
 
-      // Crisp aluminum/steel window mullions & traditional HK iron grilles (鐵窗花)
+      // aluminum/steel window mullions & traditional HK iron grilles (鐵窗花)
       const drawFrame = (targetCtx: CanvasRenderingContext2D, color: string, isAlbedo: boolean) => {
         targetCtx.strokeStyle = color;
         targetCtx.lineWidth = 8;
@@ -868,14 +868,14 @@ export function createWetRoadTextures(): {
     ctx.fillRect(tx - 30, 0, 60, H);
   }
 
-  // Crisp HK white dashed centerline (78-unit road: Yellow Box z=+0.2 [-1.05..+1.45] + Zebra z=+3.4 [+2.48..+4.33] -> y in [495..572])
+  // HK white dashed centerline (78-unit road: Yellow Box z=+0.2 [-1.05..+1.45] + Zebra z=+3.4 [+2.48..+4.33] -> y in [495..572])
   ctx.fillStyle = 'rgba(222, 232, 240, 0.62)';
   for (let y = 24; y < H - 24; y += 44) {
     if (y > 488 && y < 578) continue;
     ctx.fillRect(W * 0.5 - 3, y, 6, 22);
   }
 
-  // Crisp HK double-yellow curbside no-stopping under-lines aligned beneath 3D strips at x = ±4.93 & ±4.80
+  // HK double-yellow curbside no-stopping under-lines aligned beneath 3D strips at x = ±4.93 & ±4.80
   ctx.fillStyle = 'rgba(218, 180, 68, 0.54)';
   ctx.fillRect(21, 0, 3, H);
   ctx.fillRect(28, 0, 3, H);
@@ -944,7 +944,7 @@ export function createWetRoadTextures(): {
   }
 
   // Long gentle ramp on outer Z ends (|z| in [13.5, 20.5]) to pure WHITE (1.0)
-  // so PlanarWetReflector bounds (|z| = 21.0) vanish with ZERO visible transition ring!
+  // so PlanarWetReflector bounds (|z| = 21.0) vanish with no visible transition ring
   const topFade = actx.createLinearGradient(0, 0, 0, H * 0.34);
   topFade.addColorStop(0, 'rgb(255,255,255)');
   topFade.addColorStop(0.68, 'rgb(255,255,255)');
@@ -993,7 +993,7 @@ export function createSidewalkTexture(): THREE.CanvasTexture {
   const tile = 64;
   for (let y = 0; y < H; y += tile) {
     for (let x = 0; x < W; x += tile) {
-      // Very subtle micro-tonal variation across individual Hong Kong flagstones (zero repeating spots!)
+      // Very subtle micro-tonal variation across individual Hong Kong flagstones (zero repeating spots)
       const d = (rand() - 0.5) * 14;
       ctx.fillStyle = d > 0 ? `rgba(232,244,254,${d / 240})` : `rgba(16,26,36,${-d / 190})`;
       ctx.fillRect(x + 2, y + 2, tile - 4, tile - 4);
@@ -1006,7 +1006,7 @@ export function createSidewalkTexture(): THREE.CanvasTexture {
         ctx.fillRect(sx, sy, 2, 2);
       }
 
-      // Crisp subtle beveled concrete flagstone chamfer (bright top-left, shadowed bottom-right)
+      // subtle beveled concrete flagstone chamfer (bright top-left, shadowed bottom-right)
       ctx.fillStyle = 'rgba(226, 240, 252, 0.14)';
       ctx.fillRect(x + 2, y + 2, tile - 4, 2.2);
       ctx.fillRect(x + 2, y + 2, 2.2, tile - 4);
@@ -1020,7 +1020,7 @@ export function createSidewalkTexture(): THREE.CanvasTexture {
       ctx.lineWidth = 3;
       ctx.strokeRect(x + 1, y + 1, tile - 2, tile - 2);
 
-      // Crisp dark mortar joint groove
+      // dark mortar joint groove
       ctx.strokeStyle = 'rgba(18, 28, 38, 0.42)';
       ctx.lineWidth = 1.8;
       ctx.strokeRect(x + 0.5, y + 0.5, tile - 1, tile - 1);
@@ -1269,7 +1269,7 @@ export function createShopInteriorTexture(
   const [canvas, ctx] = makeCanvas(W, H);
 
   if (kind === 'mart') {
-    // Crisp icy-cyan 24H convenience store back-wall chiller cabinet bank
+    // icy-cyan 24H convenience store back-wall chiller cabinet bank
     const grad = ctx.createLinearGradient(0, 0, 0, H);
     grad.addColorStop(0, '#d8f9ff');
     grad.addColorStop(0.24, '#8de0f8');
@@ -1344,7 +1344,7 @@ export function createShopInteriorTexture(
       ctx.fillRect(sx + colW - 18, 220, 5, 86);
     }
   } else {
-    // Rich warm golden tungsten Hong Kong Cha Chaan Teng / Wonton Noodle shop interior!
+    // Rich warm golden tungsten Hong Kong Cha Chaan Teng / Wonton Noodle shop interior
     const grad = ctx.createLinearGradient(0, 0, 0, H);
     grad.addColorStop(0, '#ffe2a4');
     grad.addColorStop(0.38, '#ee9b40');
@@ -1401,7 +1401,7 @@ export function createShopInteriorTexture(
       ctx.fill();
     }
 
-    // Iconic red-and-gold calligraphic header banner plaque
+    // red-and-gold calligraphic header banner plaque
     const bannerW = Math.round(W * 0.68);
     const bannerX = Math.round((W - bannerW) * 0.5);
     ctx.fillStyle = kind === 'chachaanteng' ? '#1a4c3b' : '#8a221c';
@@ -1461,7 +1461,7 @@ export function createShopInteriorTexture(
     });
 
     if (kind === 'noodle') {
-      // Illuminated Hong Kong Siu-Mei hanging roast-meat showcase on right side (燒味櫥窗)!
+      // Illuminated Hong Kong Siu-Mei hanging roast-meat showcase on right side (燒味櫥窗)
       const sw = Math.min(232, Math.round(W * 0.34));
       const sx = W - sw - 26;
       const sy = 250;
@@ -1540,14 +1540,14 @@ export function createVendingMachineTextureSet(
   const [eCanvas, ectx] = makeCanvas(W, H);
 
   const isTeal = variant === 'teal';
-  // Crisp painted metallic casing (does NOT glow in emissiveMap -> zero white blowout!)
+  // painted metallic casing (does NOT glow in emissiveMap -> zero white blowout)
   ctx.fillStyle = isTeal ? '#234c5c' : '#8d2b2e';
   ctx.fillRect(0, 0, W, H);
   ctx.strokeStyle = isTeal ? '#142d38' : '#53181a';
   ctx.lineWidth = 10;
   ctx.strokeRect(5, 5, W - 10, H - 10);
 
-  // Emissive map starts pure black so ONLY backlit showcase, header & Octopus pad glow
+  // Emissive map starts pure black so only backlit showcase, header & Octopus pad glow
   ectx.fillStyle = '#000000';
   ectx.fillRect(0, 0, W, H);
 
@@ -1612,7 +1612,7 @@ export function createVendingMachineTextureSet(
       ectx.fillRect(bx, ry + 6, 20, 33);
       ectx.globalAlpha = 1.0;
 
-      // Crisp label band & bottle cap
+      // label band & bottle cap
       ctx.fillStyle = 'rgba(255,255,255,0.82)';
       ctx.fillRect(bx + 2, ry + 17, 16, 8);
       ctx.fillStyle = '#f2f8fc';
@@ -1626,7 +1626,7 @@ export function createVendingMachineTextureSet(
     }
   }
 
-  // Lower control area (dark recessed pickup bay — stays dark in emissiveMap!)
+  // Lower control area (dark recessed pickup bay — stays dark in emissiveMap)
   ctx.fillStyle = '#15222c';
   ctx.fillRect(24, 364, W - 104, 96);
   ctx.strokeStyle = '#5e7a8c';
@@ -1909,7 +1909,7 @@ export function createTramBillboardTexture(): THREE.CanvasTexture {
   ctx.lineWidth = 2;
   ctx.strokeRect(11, 11, W - 22, H - 22);
 
-  // Crisp square red 叮叮 heritage seal on the left
+  // square red 叮叮 heritage seal on the left
   const sealX = 18;
   const sealY = 16;
   const sealW = 86;
@@ -2257,7 +2257,7 @@ export function createMistCloudTexture(seed = 2026): THREE.CanvasTexture {
     ctx.fill();
   }
 
-  // Strict circular alpha envelope guaranteeing exact 0 alpha for r >= 0.43*S (zero quad seams!)
+  // Strict circular alpha envelope guaranteeing exact 0 alpha for r >= 0.43*S (zero quad seams)
   ctx.save();
   ctx.globalCompositeOperation = 'destination-in';
   const mask = ctx.createRadialGradient(S * 0.5, S * 0.5, S * 0.14, S * 0.5, S * 0.5, S * 0.43);
@@ -2396,7 +2396,7 @@ export function createArchedNeonSignTexture(spec: {
   }
   ctx.restore();
 
-  // Calligraphic neon main text + subtext (uniformly fitted with zero horizontal crushing!)
+  // Calligraphic neon main text + subtext (uniformly fitted with zero horizontal crushing)
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -2677,7 +2677,7 @@ export function createRoadStencilTexture(dir: 'left' | 'right'): THREE.CanvasTex
   fitFontSize(ctx, en, 900, 50, 24, HK_SANS, W - 48);
   ctx.fillText(en, W * 0.5, 138);
 
-  // Crisp directional arrow below lettering
+  // directional arrow below lettering
   const sign = dir === 'right' ? 1 : -1;
   ctx.beginPath();
   ctx.moveTo(W * 0.5 - sign * 118, 198);
@@ -2973,7 +2973,7 @@ export function createMinibusSideTexture(): THREE.CanvasTexture {
   ctx.fillStyle = '#114d30';
   ctx.fillRect(0, 94, W, 6);
 
-  // Crisp gold/white "公共小型巴士 · 16 SEATS" lettering on the green belt
+  // gold/white "公共小型巴士 · 16 SEATS" lettering on the green belt
   ctx.fillStyle = '#f4f0e0';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

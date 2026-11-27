@@ -521,7 +521,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
               }
             }
 
-            // Optional tiny potted terracotta houseplant perched inside the flower cage (花籠盆栽!)
+            // Optional tiny potted terracotta houseplant perched inside the flower cage (花籠盆栽)
             if (cageSpec.hasPlant) {
               const pot = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.065, 0.048, 0.11, 8),
@@ -541,7 +541,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
             winNode.add(cage);
           }
 
-          // 5. Optional Iconic HK Projecting Bamboo Laundry Pole (晾衫竹) with swaying garments!
+          // 5. Optional HK Projecting Bamboo Laundry Pole (晾衫竹) with swaying garments
           const poleSpec = cfg.laundryPoles?.find((lp) => lp.face === face && lp.col === c && lp.row === r);
           if (poleSpec) {
             const poleGroup = new THREE.Group();
@@ -632,7 +632,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     board.castShadow = true;
     signGroup.add(board);
 
-    // 3D Glowing Glass Neon Perimeter Trim Tubes hugging both faces of the projecting sign!
+    // 3D Glowing Glass Neon Perimeter Trim Tubes hugging both faces of the projecting sign
     const tubeMat = new THREE.MeshStandardMaterial({
       color: opts.emissiveHex,
       emissive: new THREE.Color(opts.emissiveHex),
@@ -781,7 +781,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
   // =========================================================================
   // B1: Front-Left Corner Curved Tong Lau (弧角唐樓) + 金鳳冰室 Cha Chaan Teng
   // Footprint: x in [-14.0, -7.6], z in [+4.0, +9.6], height = 8.4
-  // Wide 2.5m open promenade in front & 1.8m HK side-alley (後巷) to B2!
+  // Wide 2.5m open promenade in front & 1.8m HK side-alley (後巷) to B2
   // =========================================================================
   {
     const b1 = new THREE.Group();
@@ -830,7 +830,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       roughness: 0.45
     });
 
-    // Recessed warm glowing Cha Chaan Teng back-wall core (carves 1.85-unit real 3D arcade interior!)
+    // Recessed warm glowing Cha Chaan Teng back-wall core (carves 1.85-unit real 3D arcade interior)
     const coreW = W - 1.85;
     const coreD = D - 1.65;
     const core = new THREE.Mesh(
@@ -852,7 +852,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     arcadeSoffit.position.set(cx, Y0 + arcadeH - 0.05, cz);
     b1.add(arcadeSoffit);
 
-    // 3D Interior Cha Chaan Teng Water-Bar Counter (水吧) + Bakery Glass Display Case!
+    // 3D Interior Cha Chaan Teng Water-Bar Counter (水吧) + Bakery Glass Display Case
     const counterGroup = new THREE.Group();
     const barBase = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.92, 2.55), dadoMat);
     barBase.position.set(cx + 1.70, Y0 + 0.46, cz - 0.65);
@@ -967,7 +967,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       b1.add(capital);
     }
 
-    // Detailed Cha Chaan Teng round marble café tables, brass rims, red stools & tiny milk-tea cups!
+    // Detailed Cha Chaan Teng round marble café tables, brass rims, red stools & tiny milk-tea cups
     const tableTopMat = new THREE.MeshStandardMaterial({ color: 0xebe3d5, roughness: 0.34 });
     const stoolMat = new THREE.MeshStandardMaterial({ color: 0xb43c36, roughness: 0.48 });
     const cupMat = new THREE.MeshStandardMaterial({ color: 0xf4f2ec, roughness: 0.25 });
@@ -1125,7 +1125,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     curvedCorner.castShadow = true;
     b1.add(curvedCorner);
 
-    // Continuous Art-Deco Tong Lau cornice slabs + matching curved corner collar bands!
+    // Continuous Art-Deco Tong Lau cornice slabs + matching curved corner collar bands
     const corniceMat = new THREE.MeshStandardMaterial({ color: 0x9b897c, roughness: 0.80 });
     const corniceYs = [Y0 + arcadeH + 0.05, Y0 + arcadeH + 2.6, Y0 + arcadeH + upperH + 0.08];
     for (const cy of corniceYs) {
@@ -1182,7 +1182,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       ]
     });
 
-    // Open wrought-iron Tong Lau balconies on +Z south face + bamboo laundry pole (晾衫竹)!
+    // Open wrought-iron Tong Lau balconies on +Z south face + bamboo laundry pole (晾衫竹)
     for (const [bIdx, by] of ([Y0 + arcadeH + 0.55, Y0 + arcadeH + 3.15] as const).entries()) {
       const balX = cx - 0.6;
       const balZFront = cz + D * 0.5 + 0.52;
@@ -1213,7 +1213,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
         b1.add(spindle);
       }
 
-      // Iconic Hong Kong Bamboo Laundry Pole poking out from upper balcony rail!
+      // Hong Kong Bamboo Laundry Pole poking out from upper balcony rail
       if (bIdx === 1) {
         const poleGrp = new THREE.Group();
         poleGrp.position.set(balX + 0.55, by + 0.30, balZFront);
@@ -1245,7 +1245,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     addDrainagePipeRun(b1, cx - W * 0.5 - 0.06, cz + D * 0.5 + 0.04, Y0 + arcadeH + upperH + 0.08, Y0, [0, 1], true);
     addDrainagePipeRun(b1, cx + W * 0.5 + 0.06, cz - D * 0.5 + 0.12, Y0 + arcadeH + upperH + 0.08, Y0, [1, 0], false);
 
-    // Authentic 1950s Hong Kong Curved Tong Lau Art-Deco Parapet Roof Terrace (弧角唐樓天台)
+    // 1950s Hong Kong Curved Tong Lau Art-Deco Parapet Roof Terrace (弧角唐樓天台)
     const roofBaseY = Y0 + arcadeH + upperH + 0.14;
     const roofDeck = new THREE.Mesh(new THREE.BoxGeometry(W - 0.14, 0.10, D - 0.14), roofFlatMat);
     roofDeck.position.set(cx, roofBaseY, cz);
@@ -1273,7 +1273,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       b1.add(cap);
     }
 
-    // Elevated Streamline Moderne Curved Corner Pediment + Embossed Heritage '1958' Plaque!
+    // Elevated Streamline Moderne Curved Corner Pediment + Embossed Heritage '1958' Plaque
     const curvedParapet = new THREE.Mesh(
       new THREE.CylinderGeometry(curveRadius + 0.02, curveRadius + 0.02, pH + 0.34, 16, 1, false, 0, Math.PI * 0.5),
       corniceMat
@@ -1289,7 +1289,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     curvedCap.position.set(curveCX, roofBaseY + pH + 0.38, curveCZ);
     b1.add(curvedCap);
 
-    // Embossed '1958' plaque angled cleanly across the curved corner pediment facing SE camera!
+    // Embossed '1958' plaque angled cleanly across the curved corner pediment facing SE camera
     const plaqueMat1958 = new THREE.MeshStandardMaterial({
       map: createHeritageDatePlaqueTexture(),
       roughness: 0.68,
@@ -1303,7 +1303,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     datePlaque.rotation.y = Math.PI * 0.25;
     b1.add(datePlaque);
 
-    // Tiled Rooftop Stair Bulkhead (天台樓梯屋) with pitched slate-tile roof & glowing stairwell transom!
+    // Tiled Rooftop Stair Bulkhead (天台樓梯屋) with pitched slate-tile roof & glowing stairwell transom
     const pitchedRoofMat = new THREE.MeshStandardMaterial({
       map: darkRoofTileTex,
       roughness: 0.72,
@@ -1444,7 +1444,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     addBoxAC(b1, cx + 1.4, Y0 + 4.1, southZ + 0.18, 0);
     addBoxAC(b1, cx - 1.5, Y0 + 6.6, southZ + 0.18, 0);
 
-    // Projecting Hero HK Neon Signs on B1 east street face (cleanly anchored to eastX = -7.6)
+    // Projecting HK Neon Signs on B1 east street face (cleanly anchored to eastX = -7.6)
     const pawnTex = createPawnshopNeonTexture();
     addProjectingNeon(b1, pawnTex, {
       x: eastX + 0.52,
@@ -1490,7 +1490,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
 
   // =========================================================================
   // B2: Mid-Left Wan Chai Blue-Green Tiled Tong Lau (藍屋風 + 明記雲吞麵 + 竹棚)
-  // Footprint: x in [-12.2, -6.6], z in [-1.4, +2.2], cleanly south of viaduct!
+  // Footprint: x in [-12.2, -6.6], z in [-1.4, +2.2], cleanly south of viaduct
   // =========================================================================
   {
     const b2 = new THREE.Group();
@@ -1503,7 +1503,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     const southZ = cz + D * 0.5;
     addContactShadow(cx, cz, W, D, 0.64);
 
-    // 1. Physically Recessed Ground-Floor Wonton Noodle Shop (明記雲吞麵) + 3D Noodle-Cooking Stall!
+    // 1. Physically Recessed Ground-Floor Wonton Noodle Shop (明記雲吞麵) + 3D Noodle-Cooking Stall
     const gfH = 2.6;
     const noodleTex = createShopInteriorTexture('noodle');
     const noodleMat = new THREE.MeshStandardMaterial({
@@ -1564,7 +1564,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     // Folded HK iron accordion security gate tucked cleanly on south side of noodle shop
     addAccordionGate(b2, eastX - 0.14, Y0, cz + D * 0.5 - 0.34, gfH - 0.18, Math.PI / 2);
 
-    // 3D Open Noodle-Cooking Stall Counter (麵檔煮麵爐) with stainless steam hood, bowls & warm glow!
+    // 3D Open Noodle-Cooking Stall Counter (麵檔煮麵爐) with stainless steam hood, bowls & warm glow
     const stallGrp = new THREE.Group();
     const stallX = eastX - 0.42;
     const stallZ = cz - 0.35;
@@ -1634,7 +1634,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     markTiny(hoodFlue);
     stallGrp.add(hoodFlue);
 
-    // 3 Tiny red noodle-stall stools lined neatly outside counter (clear of Dai Pai Dong table!)
+    // 3 Tiny red noodle-stall stools lined neatly outside counter (clear of Dai Pai Dong table)
     const noodleStoolMat = new THREE.MeshStandardMaterial({ color: 0xb03a32, roughness: 0.52 });
     for (const sz of [stallZ - 0.56, stallZ, stallZ + 0.56]) {
       const s = new THREE.Mesh(new THREE.CylinderGeometry(0.125, 0.105, 0.42, 10), noodleStoolMat);
@@ -1755,7 +1755,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     // Cast-iron exterior drainage stack on B2 north-east corner
     addDrainagePipeRun(b2, cx + W * 0.5 + 0.05, cz - D * 0.5 + 0.06, Y0 + gfH + upperH, Y0, [1, 0], false);
 
-    // Authentic Wan Chai horizontal-ridge Chinese pitched tiled gable roof (金字瓦頂)
+    // Wan Chai horizontal-ridge Chinese pitched tiled gable roof (金字瓦頂)
     const b2RoofMat = new THREE.MeshStandardMaterial({
       map: blueRoofTileTex,
       roughness: 0.70,
@@ -1799,7 +1799,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       b2.add(gutter);
     }
 
-    // 3. Upgraded Authentic Hong Kong BAMBOO SCAFFOLDING (竹棚) with X-braces, Instanced nylon knots & planks!
+    // 3. Hong Kong bamboo scaffolding (竹棚) with X-braces, Instanced nylon knots & planks
     const scaffGroup = new THREE.Group();
     const scaffY0 = Y0 + 2.85;
     const scaffH = 4.1;
@@ -1848,7 +1848,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       }
     }
 
-    // Criss-cross X diagonal bamboo cross-braces on BOTH east (+X) and south (+Z) faces!
+    // Criss-cross X diagonal bamboo cross-braces on both east (+X) and south (+Z) faces
     for (const ang of [0.54, -0.54]) {
       const eDiag = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 4.45, 6), bambooMat);
       eDiag.rotation.x = ang;
@@ -1861,7 +1861,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       scaffGroup.add(sDiag);
     }
 
-    // InstancedMesh dark black nylon tie-knots (尼龍篾) at EVERY pole intersection!
+    // InstancedMesh dark black nylon tie-knots (尼龍篾) at each pole intersection
     const knotCoords: Array<[number, number, number]> = [];
     for (const ly of ledgerYs) {
       for (const pz of eastPoleZs) knotCoords.push([scaffEastX, ly, pz]);
@@ -1951,7 +1951,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       scaffoldBeaconSprite.renderOrder = 7;
       beaconGroup.add(scaffoldBeaconSprite);
 
-      // Crisp yellow-and-black Hong Kong bilingual scaffolding safety sign (小心高空工作 / CAUTION)
+      // yellow-and-black Hong Kong bilingual scaffolding safety sign (小心高空工作 / CAUTION)
       const warnCanvas = document.createElement('canvas');
       warnCanvas.width = 256;
       warnCanvas.height = 96;
@@ -2103,7 +2103,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       rows: 4,
       faces: ['+X', '+Z'],
       hoodMat: coolConcreteMat,
-      // Skip +Z col 0 behind the steel fire escape so zero collision!
+      // Skip +Z col 0 behind the steel fire escape so zero collision
       skipCells: [
         { face: '+Z', col: 0, row: 0 },
         { face: '+Z', col: 0, row: 1 },
@@ -2122,7 +2122,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     addDrainagePipeRun(b3, cx - W * 0.5 - 0.06, cz + D * 0.5 - 0.12, Y0 + H, Y0, [-1, 0], false);
 
     // Rooftop parapet, stair penthouse, illegal corrugated tin penthouse (天台鐵皮屋),
-    // raised water tank, curved satellite dish (衛星天線), fishbone TV aerial & red beacon!
+    // raised water tank, curved satellite dish (衛星天線), fishbone TV aerial & red beacon
     const roofY = Y0 + H;
     const pThick = 0.24;
     const pH = 0.58;
@@ -2150,7 +2150,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     markTiny(stairDoor);
     b3.add(stairDoor);
 
-    // Rooftop Corrugated Tin Illegal Penthouse (天台鐵皮屋) with sloped roof & glowing tiny window!
+    // Rooftop Corrugated Tin Illegal Penthouse (天台鐵皮屋) with sloped roof & glowing tiny window
     const tinHutMat = new THREE.MeshStandardMaterial({
       map: tinPenthouseTex,
       roughness: 0.68,
@@ -2187,7 +2187,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     hutWinX.position.set(hutX + 1.03, roofY + 0.78, hutZ);
     b3.add(hutWinX);
 
-    // Raised Galvanized Steel Water Tank on 4 Concrete Pier Legs + feeder pipes!
+    // Raised Galvanized Steel Water Tank on 4 Concrete Pier Legs + feeder pipes
     const tankBaseX = cx + 1.25;
     const tankBaseZ = cz - 1.18;
     for (const [lx, lz] of [
@@ -2284,7 +2284,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     b3.add(beaconBulb);
 
     // Upgraded External Dark-Steel Fire-Escape Staircase with Instanced individual stair steps,
-    // double mid-railings & vertical caged roof-access ladder!
+    // double mid-railings & vertical caged roof-access ladder
     const feGroup = new THREE.Group();
     const feZ = cz + D * 0.5 + 0.34;
     const feXLeft = cx - 2.2;
@@ -2330,7 +2330,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
         feGroup.add(up);
       }
 
-      // Flights between landings: side steel stringer beams + sloped handrails + individual instanced steps!
+      // Flights between landings: side steel stringer beams + sloped handrails + individual instanced steps
       if (lv < 3) {
         const goRight = lv % 2 === 0;
         const x0 = goRight ? feXLeft + 0.16 : feXRight - 0.16;
@@ -2356,7 +2356,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
         markTiny(stairRail);
         feGroup.add(stairRail);
 
-        // Individual horizontal grated stair treads!
+        // Individual horizontal grated stair treads
         for (let s = 0; s < stepsPerFlight; s++) {
           const t = (s + 0.5) / stepsPerFlight;
           stepDummy.position.set(x0 + dxRun * t, y0 + dyRun * t, feZ);
@@ -2378,7 +2378,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       feGroup.add(col);
     }
 
-    // Vertical Caged Steel Roof-Access Ladder (屋頂爬梯) from top landing over roof parapet!
+    // Vertical Caged Steel Roof-Access Ladder (屋頂爬梯) from top landing over roof parapet
     const ladderGrp = new THREE.Group();
     const ladX = feXLeft + 0.24;
     const ladZ = feZ + 0.24;
@@ -2438,7 +2438,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       flickerPhase: 2.1
     });
 
-    // Classic Projecting Ornate Kowloon Neon Sign (海鮮酒家) high on B3's east face (clear above viaduct!)
+    // Classic Projecting Ornate Kowloon Neon Sign (海鮮酒家) high on B3's east face (clear above viaduct)
     const seafoodNeonTex = createArchedNeonSignTexture({
       mainText: '海鮮酒家',
       subText: 'DRAGON SEAFOOD PALACE',
@@ -2500,9 +2500,9 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
   }
 
   // =========================================================================
-  // B6: Back-West Companion Ochre Tenement (永安樓 — stepped companion beside B3!)
+  // B6: Back-West Companion Ochre Tenement (永安樓 — stepped companion beside B3)
   // Footprint: x in [-16.6, -11.9], z in [-12.2, -7.2], height = 8.6m
-  // Turns B3 from an isolated pillar into a cohesive layered Kowloon urban block!
+  // Turns B3 from an isolated pillar into a cohesive layered Kowloon urban block
   // =========================================================================
   {
     const b6 = new THREE.Group();
@@ -2601,7 +2601,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     b6Tank.castShadow = true;
     b6.add(b6Tank);
 
-    // Classic projecting Kowloon emerald-rose vertical neon sign: 賓館 HOSTEL peeking cleanly above viaduct!
+    // Classic projecting Kowloon emerald-rose vertical neon sign: 賓館 HOSTEL peeking cleanly above viaduct
     const hostelTex = createNeonSignTexture({
       text: '賓館',
       subText: 'HOSTEL',
@@ -2634,9 +2634,9 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
   }
 
   // =========================================================================
-  // B4: Far-Right Jade-Green Mosaic Shophouse behind Viaduct (紙皮石唐樓 + 3D 便利店 24H!)
-  // Footprint: x in [+12.4, +18.4], z in [-12.4, -6.8], cleanly north of viaduct!
-  // Elevated to 3 upper storeys (upperH = 7.5) so roofline & neon signs crown proudly above viaduct!
+  // B4: Far-Right Jade-Green Mosaic Shophouse behind Viaduct (紙皮石唐樓 + 3D 便利店 24H)
+  // Footprint: x in [+12.4, +18.4], z in [-12.4, -6.8], cleanly north of viaduct
+  // Elevated to 3 upper storeys (upperH = 7.5) so roofline & neon signs clear above viaduct
   // =========================================================================
   {
     const b4 = new THREE.Group();
@@ -2651,7 +2651,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
 
     // -----------------------------------------------------------------------
     // 1. REAL 3D RECESSED 24H CONVENIENCE STORE INTERIOR (便利店 24H)
-    // Open wrap-around 3D recessed interior behind +Z south & -X street glass mullions!
+    // Open wrap-around 3D recessed interior behind +Z south & -X street glass mullions
     // -----------------------------------------------------------------------
     const martBackChillerTex = createShopInteriorTexture('mart', 1076, 512);
     const martBackChillerMat = new THREE.MeshStandardMaterial({
@@ -2699,7 +2699,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     });
     emissiveTracks.push({ mat: fluoTubeMat, baseIntensity: 2.35 });
 
-    // Solid Structural Back (-Z) and East (+X) walls with glowing interior beverage chillers!
+    // Solid Structural Back (-Z) and East (+X) walls with glowing interior beverage chillers
     const backWall = new THREE.Mesh(
       new THREE.BoxGeometry(W - 0.12, gfH, 0.42),
       [jadeBaseMat, jadeBaseMat, jadeBaseMat, jadeBaseMat, martBackChillerMat, jadeBaseMat]
@@ -2736,7 +2736,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       b4.add(pier);
     }
 
-    // Interior Convenience Store Floor, Glowing Ceiling & 4 Illuminated 3D Fluorescent Light Tube Strips!
+    // Interior Convenience Store Floor, Glowing Ceiling & 4 Illuminated 3D Fluorescent Light Tube Strips
     const martFloor = new THREE.Mesh(new THREE.BoxGeometry(W - 0.44, 0.05, D - 0.44), martFloorMat);
     martFloor.position.set(cx, Y0 + 0.025, cz);
     martFloor.receiveShadow = true;
@@ -2753,7 +2753,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       b4.add(tube);
     }
 
-    // 2 Multi-Tier 3D Steel Shelving Gondola Racks inside the recessed store (deep 3D parallax!)
+    // 2 Multi-Tier 3D Steel Shelving Gondola Racks inside the recessed store (deep 3D parallax)
     const rackFrameMat = new THREE.MeshStandardMaterial({
       color: 0xdcebf0,
       emissive: new THREE.Color(0x56b8d2),
@@ -2805,7 +2805,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       b4.add(gGrp);
     }
 
-    // Front-Window Low Display Rack facing +Z right glass bay (clear of sliding doors!)
+    // Front-Window Low Display Rack facing +Z right glass bay (clear of sliding doors)
     const frontRackX = cx + 1.56;
     const frontRackZ = cz + D * 0.5 - 0.76;
     const frontRackLen = 1.64;
@@ -2821,7 +2821,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     markTiny(frontRackGrp);
     b4.add(frontRackGrp);
 
-    // InstancedMesh #1 & #2: ~200 Crisp Colorful Miniature Drink Bottles & Snack Packs stocked on shelves!
+    // InstancedMesh #1 & #2: ~200 Colorful Miniature Drink Bottles & Snack Packs stocked on shelves
     const bottleTransforms: Array<{ x: number; y: number; z: number; sx: number; sy: number; sz: number; hex: number }> = [];
     const snackTransforms: Array<{ x: number; y: number; z: number; sx: number; sy: number; sz: number; hex: number }> = [];
     const drinkPalette = [0xe63c38, 0x2eb468, 0xf2b42c, 0x2c86e8, 0xf2f6fa, 0xe05294, 0x46c8b6, 0xf07a2c];
@@ -2944,7 +2944,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     markTiny(snackInst);
     b4.add(snackInst);
 
-    // 3D Checkout Counter (收銀處) with glowing POS terminal & warm HK fishball/siu-mai hot steamer!
+    // 3D Checkout Counter (收銀處) with glowing POS terminal & warm HK fishball/siu-mai hot steamer
     const counterX = cx - 1.82;
     const counterZ = cz + 0.12;
     const checkoutGrp = new THREE.Group();
@@ -2971,7 +2971,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     posMonitor.rotation.y = -0.3;
     checkoutGrp.add(posMonitor);
 
-    // Warm-amber glowing HK 7-11 Hot-Food Glass Steamer Cabinet (魚蛋燒賣蒸爐!)
+    // Warm-amber glowing HK 7-11 Hot-Food Glass Steamer Cabinet (魚蛋燒賣蒸爐)
     const hotBoxMat = new THREE.MeshStandardMaterial({
       color: 0xffe4a4,
       emissive: new THREE.Color(0xff9a38),
@@ -2985,7 +2985,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     markTiny(checkoutGrp);
     b4.add(checkoutGrp);
 
-    // 3D Aluminum Glass Mullion Storefront Frames + Automatic Sliding Doors (both +Z and -X faces!)
+    // 3D Aluminum Glass Mullion Storefront Frames + Automatic Sliding Doors (both +Z and -X faces)
     const southGlassZ = cz + D * 0.5 - 0.08;
     const westGlassX = cx - W * 0.5 + 0.08;
 
@@ -3053,7 +3053,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       b4.add(leafGrp);
     }
 
-    // Subtle semi-transparent storefront glazing (+Z face, zero Z-fighting!)
+    // Subtle semi-transparent storefront glazing (+Z face, zero Z-fighting)
     const southGlassPane = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.94, gfH - 0.22), clearGlassMat);
     southGlassPane.position.set(cx, Y0 + gfH * 0.5, southGlassZ - 0.04);
     markTiny(southGlassPane);
@@ -3092,7 +3092,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     markTiny(westGlassPane);
     b4.add(westGlassPane);
 
-    // Glowing icy-cyan 便利店 24H corner fascia signboards with dedicated exact-AR textures & 6-material arrays!
+    // Glowing icy-cyan 便利店 24H corner fascia signboards with dedicated exact-AR textures & 6-material arrays
     const martSignWestTex = createNeonSignTexture({
       text: '便利店 24H',
       subText: 'CONVENIENCE · 冷飲小食',
@@ -3169,7 +3169,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     }
 
     // -----------------------------------------------------------------------
-    // 2. Upper Jade-Green Mosaic Tile Facade (紙皮石唐樓 — 3 upper storeys clearing viaduct!)
+    // 2. Upper Jade-Green Mosaic Tile Facade (紙皮石唐樓 — 3 upper storeys clearing viaduct)
     // -----------------------------------------------------------------------
     const b4Tex = createFacadeTextureSet({
       seed: 404,
@@ -3285,7 +3285,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     markTiny(shedDoor);
     b4.add(shedDoor);
 
-    // Warm glowing iron-grilled rooftop shack window (天台屋暖光窗) + rooftop bamboo laundry rack!
+    // Warm glowing iron-grilled rooftop shack window (天台屋暖光窗) + rooftop bamboo laundry rack
     const b4ShackWinMat = new THREE.MeshStandardMaterial({
       color: 0xffdf9a,
       emissive: new THREE.Color(0xffa43c),
@@ -3375,7 +3375,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       }
     }
 
-    // Projecting vertical Hong Kong neon signs on B4 elevated cleanly ABOVE viaduct deck!
+    // Projecting vertical Hong Kong neon signs on B4 elevated cleanly above viaduct deck
     const teaTex = createNeonSignTexture({
       text: '涼茶',
       subText: 'HERBAL TEA',
@@ -3439,7 +3439,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
   // (灣仔站 A3 出口) + INTEGRATED VENDING ALCOVE (x in [6.40, 13.60], z in [-0.40, 2.20])
   // Real recessed descending stairwell (pit cut into East sidewalk & ground at x in [9.18, 13.32],
   // z in [-0.22, 1.94]), downward-sloping stainless handrails, Wan Chai emerald mosaic walls,
-  // solid MTR utility core behind flush vending machines, and unified canopy + fascia!
+  // solid MTR utility core behind flush vending machines, and unified canopy + fascia
   // =========================================================================
   {
     const mtrGroup = new THREE.Group();
@@ -3513,7 +3513,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     });
     emissiveTracks.push({ mat: mtrVendHeaderMat, baseIntensity: 0.56 });
 
-    // Contact AO strictly beneath the solid West utility & vending bay (never covering open stairwell pit!)
+    // Contact AO strictly beneath the solid West utility & vending bay (never covering open stairwell pit)
     addContactShadow(7.70, 0.85, 2.60, 2.50, 0.46);
 
     // 1. East Bay: Genuine Recessed Descending MTR Subway Stairwell (x in [9.00, 13.50], z in [-0.40, 2.10])
@@ -3555,7 +3555,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       mtrGroup.add(capStone);
     }
 
-    // Flush granite coping cap along North parapet wall (fitted cleanly between West & East caps — zero z-fight!)
+    // Flush granite coping cap along North parapet wall (fitted cleanly between West & East caps — zero z-fight)
     const northCap = new THREE.Mesh(new THREE.BoxGeometry(sw - 0.44, 0.08, 0.24), coolConcreteMat);
     northCap.position.set(sx, wallTopY + 0.04, -0.31);
     northCap.receiveShadow = true;
@@ -3582,7 +3582,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     markTiny(topNosing);
     mtrGroup.add(topNosing);
 
-    // 7 Real Descending Concrete Subway Steps at 24.0 deg pitch (clearly readable from SE iso & Print Mode!)
+    // 7 Real Descending Concrete Subway Steps at 24.0 deg pitch (clearly readable from SE iso & Print Mode)
     const stepCount = 7;
     const stepDrop = 0.125;
     const stepRun = 0.28;
@@ -3608,7 +3608,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       step.receiveShadow = true;
       mtrGroup.add(step);
 
-      // Crisp HK yellow anti-slip nosing strip along each step's descending north edge
+      // HK yellow anti-slip nosing strip along each step's descending north edge
       const nosing = new THREE.Mesh(new THREE.BoxGeometry(stepW - 0.04, 0.014, 0.042), mtrNosingMat);
       nosing.position.set(sx, stepTopY + 0.007, pitMaxZ - (st + 1) * stepRun + 0.024);
       markTiny(nosing);
@@ -3634,7 +3634,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     markTiny(tunnelCeilingLight);
     mtrGroup.add(tunnelCeilingLight);
 
-    // Properly Engineered Downward-Sloping Brushed Stainless-Steel MTR Handrails (100% exact 24° pitch & post fit!)
+    // Properly Engineered Downward-Sloping Brushed Stainless-Steel MTR Handrails (100% exact 24° pitch & post fit)
     const railTopZ = 1.90;
     const railBotZ = pitMaxZ - stepCount * stepRun; // -0.02
     const railTopY = Y0 + 0.78;
@@ -3707,7 +3707,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     makeMtrHandrail(13.23, 1);   // East wall-mounted handrail
 
     // 2. Unified Sloped MTR Steel-and-Glass Canopy Roof + Exact-Fit Structural Columns
-    // Pitched gently DOWN toward rear (-Z) so rainwater drains into rear gutter and front fascia tucks cleanly beneath!
+    // Pitched gently DOWN toward rear (-Z) so rainwater drains into rear gutter and front fascia tucks cleanly beneath
     const canopyCenterX = 10.00;
     const canopyCenterY = Y0 + 2.88;
     const canopyCenterZ = 0.92;
@@ -3743,7 +3743,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     markTiny(rearGutter);
     mtrGroup.add(rearGutter);
 
-    // 6 Exact-Fit Structural Dark-Green Steel Canopy Columns (zero clipping through parapet walls, zero roof gaps!)
+    // 6 Exact-Fit Structural Dark-Green Steel Canopy Columns (zero clipping through parapet walls, zero roof gaps)
     const columnSpecs: Array<[number, number, number]> = [
       [6.50, 2.12, Y0],            // Front-left corner supporting West vending canopy overhang
       [6.50, -0.30, Y0],           // Back-left corner
@@ -3778,7 +3778,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     markTiny(vmSoffitBar);
     mtrGroup.add(vmSoffitBar);
 
-    // 3. Unified Full-Width Front Architectural Fascia tucked cleanly BELOW canopy front overhang!
+    // 3. Unified Full-Width Front Architectural Fascia tucked cleanly below canopy front overhang
     // Right wing (x in [9.02, 13.48]): 灣仔站 · 出口 WAN CHAI STATION A3 backlit lightbox
     const fasciaY = Y0 + 2.48; // top = Y0 + 2.82, cleanly beneath canopy underside Y0 + 2.887!
     const fasciaZ = 2.14;
@@ -3790,7 +3790,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     mtrFascia.castShadow = true;
     mtrGroup.add(mtrFascia);
 
-    // Left wing (x in [6.42, 9.02]): Matching dark emerald-teal Vending Alcove header panel flush with Exit A3 sign!
+    // Left wing (x in [6.42, 9.02]): Matching dark emerald-teal Vending Alcove header panel flush with Exit A3 sign
     const vmFascia = new THREE.Mesh(
       new THREE.BoxGeometry(2.60, 0.68, 0.16),
       [mtrGreenSteelMat, mtrGreenSteelMat, mtrGreenSteelMat, mtrGreenSteelMat, mtrVendHeaderMat, mtrGreenSteelMat]
@@ -3800,7 +3800,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     mtrGroup.add(vmFascia);
 
     // 4. West Bay: Solid Integrated MTR Ventilation / Utility Core (x in [6.40, 9.00], z in [-0.40, 1.26])
-    // Extends seamlessly all the way up to canopy soffit — ZERO dead gap behind vending machines!
+    // Extends all the way up to canopy soffit — no dead gap behind vending machines
     const utilH = getCanopyBottomY(-0.36) - Y0 + 0.02;
     const utilCore = new THREE.Mesh(
       new THREE.BoxGeometry(2.60, utilH, 1.66),
@@ -3822,7 +3822,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     markTiny(northVent);
     mtrGroup.add(northVent);
 
-    // 5. Crisp Hong Kong Beverage Vending Machines recessed cleanly flush inside the sheltered West Alcove!
+    // 5. Hong Kong Beverage Vending Machines recessed cleanly flush inside the sheltered West Alcove
     const vmSetA = createVendingMachineTextureSet('teal');
     const vmSetB = createVendingMachineTextureSet('crimson');
     const vmTealSideMat = new THREE.MeshStandardMaterial({ color: 0x265264, roughness: 0.44, metalness: 0.30 });
@@ -3934,7 +3934,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
 
   // =========================================================================
   // B5: Back-Right Concrete Substation / Mechanical Hall behind Viaduct
-  // Footprint: x in [+5.7, +11.1], z in [-13.6, -8.8], cleanly behind viaduct & clear of traction pole!
+  // Footprint: x in [+5.7, +11.1], z in [-13.6, -8.8], cleanly behind viaduct & clear of traction pole
   // =========================================================================
   {
     const b5 = new THREE.Group();
@@ -3999,7 +3999,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       ]
     });
 
-    // 3D Industrial Louvered Ventilation Grilles mounted inside heavy steel frames on +Z & +X!
+    // 3D Industrial Louvered Ventilation Grilles mounted inside heavy steel frames on +Z & +X
     const addWallLouvre = (x: number, y: number, z: number, w: number, h: number, rotY: number) => {
       const vg = new THREE.Group();
       const frame = new THREE.Mesh(new THREE.BoxGeometry(w + 0.14, h + 0.14, 0.12), darkSteelMat);
@@ -4040,7 +4040,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
     cornice.castShadow = true;
     b5.add(cornice);
 
-    // Glowing Recessed Clerestory Strip with 3D Concrete Hood/Sill & 7 Steel Mullion Frames!
+    // Glowing Recessed Clerestory Strip with 3D Concrete Hood/Sill & 7 Steel Mullion Frames
     const clerestoryMat = new THREE.MeshStandardMaterial({
       color: 0xdff6ff,
       emissive: new THREE.Color(0x88dcff),
@@ -4071,7 +4071,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       b5.add(fin);
     }
 
-    // Steel Rooftop Maintenance Safety Railings wrapping the concrete cornice perimeter!
+    // Steel Rooftop Maintenance Safety Railings wrapping the concrete cornice perimeter
     const railGrp = new THREE.Group();
     const rHalfW = W * 0.5 + 0.12;
     const rHalfD = D * 0.5 + 0.12;
@@ -4131,7 +4131,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       hLouvre.position.set(hx, roofY + 0.80, hz + 0.57);
       markTiny(hLouvre);
       b5.add(hLouvre);
-      // Top circular exhaust fan shroud + visible spinning 4-blade industrial cooling fan!
+      // Top circular exhaust fan shroud + visible spinning 4-blade industrial cooling fan
       const fanShroud = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.40, 0.16, 14), darkSteelMat);
       fanShroud.position.set(hx, roofY + 1.26, hz);
       b5.add(fanShroud);
@@ -4154,7 +4154,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       spinTracks.push({ obj: fanRotor, speed: hx < cx ? 7.8 : -6.4, phase: hx * 0.7 });
     }
 
-    // Mechanical rooftop riser manifold + insulated sheet-metal ducts & chilled-water pipes connecting both chillers!
+    // Mechanical rooftop riser manifold + insulated sheet-metal ducts & chilled-water pipes connecting both chillers
     const ductGrp = new THREE.Group();
     const riserBox = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.92, 0.80), tankSteelMat);
     riserBox.position.set(cx - 1.32, roofY + 0.76, cz + 1.15);
@@ -4201,7 +4201,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
 
   // =========================================================================
   // 6. SPINNING STAINLESS HONG KONG ROOFTOP WHIRLYBIRD TURBINES (天台無動力風球)
-  // Mounted on B1 (金鳳冰室), B6 (永安樓) & B4 (便利店唐樓) rooftops catching rainy breeze!
+  // Mounted on B1 (金鳳冰室), B6 (永安樓) & B4 (便利店唐樓) rooftops catching rainy breeze
   // =========================================================================
   {
     const addRoofWhirlybird = (wx: number, wy: number, wz: number, speed: number, phase: number) => {
@@ -4290,7 +4290,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
   const update = (simTime: number) => {
     for (let i = 0; i < flickerTracks.length; i++) {
       const track = flickerTracks[i];
-      // Gentle authentic neon ballast shimmer + rare micro-flutter
+      // Gentle neon ballast shimmer + rare micro-flutter
       const wave = Math.sin(simTime * 3.2 + track.flickerPhase) * 0.035;
       const flutter =
         Math.pow(Math.max(0, Math.sin(simTime * 1.1 + track.flickerPhase * 2.3)), 18) *
@@ -4328,7 +4328,7 @@ export function createBuildings(scene: THREE.Scene): BuildingsSystem {
       beaconMat.emissiveIntensity = (0.65 + 2.8 * pulse) * Math.max(0.55, currentEmissiveScale);
     }
 
-    // Authentic Hong Kong bamboo-scaffold corner amber construction warning lamp (~1.3 Hz pulse)
+    // Hong Kong bamboo-scaffold corner amber construction warning lamp (~1.3 Hz pulse)
     if (scaffoldBeaconMat && scaffoldBeaconHalo) {
       const sPulse = Math.pow(0.5 + 0.5 * Math.sin(simTime * Math.PI * 2.4 + 0.7), 3);
       scaffoldBeaconMat.emissiveIntensity = (0.35 + 2.45 * sPulse) * Math.max(0.60, currentEmissiveScale);
