@@ -876,11 +876,16 @@ export function createWetRoadTextures(): {
   }
 
   // HK double-yellow curbside no-stopping under-lines aligned beneath 3D strips at x = ±4.93 & ±4.80
+  // East curb breaks cleanly across the metered taxi parking bay entrance (z in [9.2, 14.0] -> y in [632, 696])
   ctx.fillStyle = 'rgba(218, 180, 68, 0.54)';
   ctx.fillRect(21, 0, 3, H);
   ctx.fillRect(28, 0, 3, H);
-  ctx.fillRect(W - 24, 0, 3, H);
-  ctx.fillRect(W - 31, 0, 3, H);
+  const bayGapY0 = 632;
+  const bayGapY1 = 696;
+  ctx.fillRect(W - 24, 0, 3, bayGapY0);
+  ctx.fillRect(W - 31, 0, 3, bayGapY0);
+  ctx.fillRect(W - 24, bayGapY1, 3, H - bayGapY1);
+  ctx.fillRect(W - 31, bayGapY1, 3, H - bayGapY1);
 
   // Broad, overlapping organic wet-rainwater sheets covering ~68% of the wider core road (|z| < 17.5)
   const sheets: Array<{ x: number; y: number; rx: number; ry: number; alpha: number }> = [

@@ -4,6 +4,7 @@ import {
   createSoftLightConeMaterial,
   type RadialMistUniforms
 } from './atmosphere';
+import { HK_SIGNAL_CYCLE_SEC, HK_SIGNAL_PHASE_OFFSET_SEC } from './hkSignal';
 import { freezeStaticTransforms, mergeStaticGroupByMaterial } from './perfUtils';
 import {
   createContactShadowTexture,
@@ -15,6 +16,52 @@ import {
   createTramBillboardTexture,
   createTramDestinationTexture
 } from './textures';
+
+interface MotionSegment {
+  dt: number;
+  v0: number;
+  v1: number;
+}
+
+/**
+ * Evaluates a C2-smooth periodic piecewise-cosine-velocity trajectory along Z.
+ * Each segment transitions speed smoothly from v0 to v1 over dt with zero end-slope,
+ * guaranteeing exact closed-form displacement, smooth braking/acceleration at red lights,
+ * and deterministic scrubbing for any simTime.
+ */
+function evalPeriodicCosineMotion(
+  clockSec: number,
+  segments: readonly MotionSegment[],
+  period: number,
+  loopLen: number,
+  startZ: number,
+  dirSign: 1 | -1,
+  halfRange: number
+): { z: number; speed: number; travelDist: number } {
+  const cycleIndex = Math.floor(clockSec / period);
+  let tRem = clockSec - cycleIndex * period;
+  let distInCycle = 0;
+  let speed = 0;
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    if (tRem <= seg.dt || i === segments.length - 1) {
+      const u = seg.dt > 0 ? Math.min(1, Math.max(0, tRem / seg.dt)) : 1;
+      speed = seg.v0 + (seg.v1 - seg.v0) * 0.5 * (1 - Math.cos(Math.PI * u));
+      const segDist =
+        seg.dt * (seg.v0 * u + (seg.v1 - seg.v0) * 0.5 * (u - Math.sin(Math.PI * u) / Math.PI));
+      distInCycle += segDist;
+      break;
+    }
+    distInCycle += seg.dt * 0.5 * (seg.v0 + seg.v1);
+    tRem -= seg.dt;
+  }
+
+  const rawZ = startZ + dirSign * distInCycle;
+  const wrappedOffset = (((rawZ + halfRange) % loopLen) + loopLen) % loopLen;
+  const z = wrappedOffset - halfRange;
+  return { z, speed, travelDist: cycleIndex * loopLen + distInCycle };
+}
 
 export interface ViaductAndVehiclesSystem {
   group: THREE.Group;
@@ -1549,7 +1596,7 @@ export function createViaductAndVehicles(
   });
   applyRadialMistFade(poleMat, mistUniforms, { innerR: 18.0, outerR: 27.0 });
 
-  const poleZs = [-13.5, 4.8, 13.8];
+  const poleZs = [-13.5, 4.8, 19.8];
   for (const pz of poleZs) {
     for (const side of [-1, 1]) {
       const px = side * 5.55;
@@ -1583,7 +1630,7 @@ export function createViaductAndVehicles(
   }
 
   // =========================================================================
-  // 4. Double-decker Hong Kong tram (叮叮車 #120) on x = -1.85, heading +Z
+  // 4. Double-decker Hong Kong tram (叮叮車 #120) on East track x = +1.85, heading +Z (HK LHT)
   // True multi-part scale-model coach: chamfered emerald waist, real 3D recessed
   // window bays over glowing 3D interior cabin (benches, brass poles, staircase,
   // 3D seated passengers), vaulted barrel-arch roof, cowcatcher fender, detailed
@@ -2549,7 +2596,15 @@ export function createViaductAndVehicles(
   tramTailPool.renderOrder = 4;
   tramGroup.add(tramTailPool);
 
-  const spraySprites: Array<{ sprite: THREE.Sprite; mat: THREE.SpriteMaterial; baseX: number; baseZ: number; dirZ: number; phase: number }> = [];
+  const spraySprites: Array<{
+    sprite: THREE.Sprite;
+    mat: THREE.SpriteMaterial;
+    baseX: number;
+    baseZ: number;
+    dirZ: number;
+    phase: number;
+    owner: 'tram' | 'minibus';
+  }> = [];
   for (let i = 0; i < 4; i++) {
     const spMat = new THREE.SpriteMaterial({
       map: glowTex,
@@ -2565,7 +2620,7 @@ export function createViaductAndVehicles(
     sp.scale.set(0.75, 0.42, 1);
     sp.renderOrder = 7;
     tramGroup.add(sp);
-    spraySprites.push({ sprite: sp, mat: spMat, baseX: sx, baseZ: sz, dirZ: -1, phase: i * 1.4 });
+    spraySprites.push({ sprite: sp, mat: spMat, baseX: sx, baseZ: sz, dirZ: -1, phase: i * 1.4, owner: 'tram' });
   }
 
   const isSolidVehicleMesh = (obj: THREE.Object3D): boolean => {
@@ -2580,7 +2635,7 @@ export function createViaductAndVehicles(
     }
   });
 
-  tramGroup.position.set(-1.85, 0, 5.6);
+  tramGroup.position.set(1.85, 0, 11.7);
   group.add(tramGroup);
 
   // =========================================================================
@@ -3050,9 +3105,9 @@ export function createViaductAndVehicles(
     apron.receiveShadow = true;
     bayGroup.add(apron);
 
-    // Concrete wheel-stop curb bumper near north head of bay
+    // Concrete wheel-stop curb bumper near south front head of bay (for LHT southbound-facing taxi)
     const wheelStop = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.11, 0.16), bayCurbMat);
-    wheelStop.position.set(bayCX, bayY + 0.075, bayCZ - 1.72);
+    wheelStop.position.set(bayCX, bayY + 0.075, bayCZ + 1.72);
     wheelStop.castShadow = true;
     bayGroup.add(wheelStop);
 
@@ -3069,6 +3124,7 @@ export function createViaductAndVehicles(
 
       for (const ry of [0.34, fenceH]) {
         const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, len, 8), bayFenceMat);
+        rail.rotation.order = 'YXZ';
         rail.rotation.x = Math.PI / 2;
         rail.rotation.y = angY;
         rail.position.set(midX, bayY + ry, midZ);
@@ -3153,12 +3209,13 @@ export function createViaductAndVehicles(
     }
   });
   taxiGroup.position.set(7.5, 0.185, 11.6);
-  taxiGroup.rotation.y = 0.0;
+  // Face southbound (+Z) along East-lane Hong Kong LHT flow (nose/grille/FOR HIRE flag toward foreground camera)
+  taxiGroup.rotation.y = Math.PI;
   group.add(taxiGroup);
 
   // =========================================================================
   // 6. ICONIC HONG KONG 16-SEAT GREEN-ROOF PUBLIC LIGHT BUS (綠頂專線小巴 28 · 銅鑼灣)
-  // Glides northbound (-Z) along the open East lane (x = +2.05) opposite Tram #120
+  // Glides northbound (-Z) along the West lane (x = -2.05, HK LHT) opposite Tram #120
   // =========================================================================
   const minibusGroup = new THREE.Group();
   minibusGroup.name = 'HK_GreenRoof_Minibus_28';
@@ -3320,9 +3377,9 @@ export function createViaductAndVehicles(
     rTrim.position.set(0, ry, mbHalfL - 0.05);
     minibusGroup.add(rTrim);
   }
-  // Kerbside (+X) folding passenger door seam, chrome boarding handrail & warm yellow step glow
+  // Kerbside (-X, left side for HK LHT/RHD) folding passenger door seam & warm yellow step glow
   const mbDoorSeam = markSkipPrintEdges(new THREE.Mesh(new THREE.BoxGeometry(0.025, 1.46, 0.03), trainRubberMat));
-  mbDoorSeam.position.set(mbHalfW + 0.005, 1.15, -1.05);
+  mbDoorSeam.position.set(-mbHalfW - 0.005, 1.15, -1.05);
   minibusGroup.add(mbDoorSeam);
   const mbStepGlowMat = new THREE.MeshStandardMaterial({
     color: 0xffe498,
@@ -3333,7 +3390,7 @@ export function createViaductAndVehicles(
   applyRadialMistFade(mbStepGlowMat, mistUniforms, vehicleFade);
   emissiveTracks.push({ mat: mbStepGlowMat, base: 1.2 });
   const mbStepLight = markSkipPrintEdges(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.08, 0.56), mbStepGlowMat));
-  mbStepLight.position.set(mbHalfW - 0.01, 0.42, -1.48);
+  mbStepLight.position.set(-mbHalfW + 0.01, 0.42, -1.48);
   minibusGroup.add(mbStepLight);
 
   // Hong Kong ceiling-mounted Minibus Speedometer LED box ("58 km/h") inside cabin
@@ -3507,7 +3564,7 @@ export function createViaductAndVehicles(
     sp.scale.set(0.68, 0.38, 1);
     sp.renderOrder = 7;
     minibusGroup.add(sp);
-    spraySprites.push({ sprite: sp, mat: spMat, baseX: sx, baseZ: sz, dirZ: 1, phase: 4.1 + i * 1.9 });
+    spraySprites.push({ sprite: sp, mat: spMat, baseX: sx, baseZ: sz, dirZ: 1, phase: 4.1 + i * 1.9, owner: 'minibus' });
   }
 
   // Soft volumetric minibus headlight beam + wet-road amber & ruby reflection pools + moving warm PointLight
@@ -3582,7 +3639,7 @@ export function createViaductAndVehicles(
       obj.userData.isMinibus = true;
     }
   });
-  minibusGroup.position.set(2.05, 0, 0.70);
+  minibusGroup.position.set(-2.05, 0, 14.3);
   group.add(minibusGroup);
 
   // Batch static sub-meshes across viaduct, traction poles, and each rigid vehicle chassis
@@ -3610,9 +3667,53 @@ export function createViaductAndVehicles(
 
   scene.add(group);
 
-  let currentTramZ = 5.65;
+  // Authentic Hong Kong Left-Hand Traffic (LHT) lane centers & 28s (= 2 x 14s) signal-synced motion schedules:
+  // - Southbound (+Z) Tram #120 rides East track (x = +1.85), braking cleanly at north stop line z = -1.85 (front bumper +1.10 < 1.2)
+  //   during Cycle B RED+RED_AMBER, then clearing the zebra crossing during Cycle B GREEN+AMBER (rear bumper +5.69 > 5.6 before RED).
+  // - Northbound (-Z) Minibus #28 rides West lane (x = -2.05), braking cleanly at south stop line z = +7.85 (front bumper +5.70 > 5.6)
+  //   during Cycle A RED+RED_AMBER, then clearing the zebra crossing during Cycle A GREEN+AMBER (rear bumper +0.23 < 1.2 before RED).
+  const TRAM_LANE_X = 1.85;
+  const MINIBUS_LANE_X = -2.05;
+  const VEHICLE_CYCLE_SEC = HK_SIGNAL_CYCLE_SEC * 2.0; // 28.0s
+
+  const TRAM_LOOP_LEN = 56.0;
+  const TRAM_HALF_RANGE = 28.0;
+  const TRAM_STOP_Z = -1.85;
+  // Anchored to Cycle B GREEN onset (sigClock = 23.0 mod 28.0); sum(dt)=28.0s, sum(dist)=56.0m
+  const TRAM_SEGMENTS: readonly MotionSegment[] = [
+    { dt: 1.5, v0: 0.0, v1: 2.68 },      // GREEN departure acceleration
+    { dt: 2.2, v0: 2.68, v1: 2.68 },     // Brisk crossing through zebra on GREEN/AMBER
+    { dt: 1.3, v0: 2.68, v1: 1.30 },     // Ease smoothly into leisurely foreground cruise (z = +8.643 at RED onset)
+    { dt: 4.5, v0: 1.30, v1: 1.30 },     // Foreground avenue glide (z = +11.70 at hero t = 0.25)
+    { dt: 2.0, v0: 1.30, v1: 4.20 },     // Accelerate entering south mist (R > 18)
+    { dt: 5.0, v0: 4.20, v1: 4.20 },     // Invisible mist turnaround wrap (+28 -> -28)
+    { dt: 2.0, v0: 4.20, v1: 2.00 },     // Decelerate emerging from north mist
+    { dt: 2.0785, v0: 2.00, v1: 2.00 },  // Approach under viaduct toward north stop line
+    { dt: 2.8, v0: 2.00, v1: 0.0 },      // Smooth braking to stop line z = -1.85 (front bumper +1.10 < 1.2)
+    { dt: 4.6215, v0: 0.0, v1: 0.0 }     // Patient red-light & red-amber wait until Cycle B GREEN
+  ];
+
+  const MB_LOOP_LEN = 60.0;
+  const MB_HALF_RANGE = 30.0;
+  const MB_STOP_Z = 7.85;
+  const MB_MIST_SPEED = 21.365 / 6.5;
+  // Anchored to Cycle A GREEN onset (sigClock = 9.0 mod 28.0); sum(dt)=28.0s, sum(dist)=60.0m
+  const MB_SEGMENTS: readonly MotionSegment[] = [
+    { dt: 1.5, v0: 0.0, v1: 2.30 },              // Cycle A GREEN departure acceleration
+    { dt: 3.5, v0: 2.30, v1: 2.30 },             // Crossing zebra northbound (z = -1.925, rear bumper +0.23 < 1.2 at RED onset)
+    { dt: 6.0, v0: 2.30, v1: 2.30 },             // Northbound exit past viaduct into north mist
+    { dt: 2.0, v0: 2.30, v1: MB_MIST_SPEED },    // Accelerate inside north mist
+    { dt: 4.5, v0: MB_MIST_SPEED, v1: MB_MIST_SPEED }, // Invisible mist wrap (-30 -> +30)
+    { dt: 2.0, v0: MB_MIST_SPEED, v1: 2.20 },    // Decelerate entering south avenue
+    { dt: 3.3, v0: 2.20, v1: 2.20 },             // Foreground northbound approach (z = +14.34 at hero t = 0.25)
+    { dt: 3.0, v0: 2.20, v1: 0.0 },              // Smooth braking to south stop line z = +7.85 (front bumper +5.70 > 5.6)
+    { dt: 2.2, v0: 0.0, v1: 0.0 }                // Patient red-light & red-amber wait until Cycle A GREEN
+  ];
+
+  let currentTramZ = 11.7;
+  let currentTramSpeed = 1.3;
   let currentTrainX = 2.2;
-  let currentMbZ = 0.70;
+  let currentMbZ = 14.3;
   let currentEmissiveScale = 1.06;
   let printModeActive = false;
 
@@ -3621,26 +3722,37 @@ export function createViaductAndVehicles(
   const minibusPosScratch = new THREE.Vector3();
 
   const update = (simTime: number) => {
-    // 1. Double-decker Tram #120 southbound on west track (x = -1.85), 28.0s period synced to 14s traffic signal
-    const tramRange = 56.0;
-    const tramSpeed = 2.0;
-    const tramOffset = ((5.65 + 28.0 + simTime * tramSpeed) % tramRange + tramRange) % tramRange;
-    currentTramZ = tramOffset - 28.0;
-    const tramSway = Math.sin(simTime * 4.2) * 0.008;
-    tramGroup.position.set(-1.85, 0, currentTramZ);
+    const sigClock = simTime + HK_SIGNAL_PHASE_OFFSET_SEC;
+
+    // 1. Double-decker Tram #120 southbound (+Z) on East track (x = +1.85, HK LHT), signal-synced 28.0s cycle
+    const tramMotion = evalPeriodicCosineMotion(
+      sigClock - 23.0,
+      TRAM_SEGMENTS,
+      VEHICLE_CYCLE_SEC,
+      TRAM_LOOP_LEN,
+      TRAM_STOP_Z,
+      1,
+      TRAM_HALF_RANGE
+    );
+    currentTramZ = tramMotion.z;
+    currentTramSpeed = tramMotion.speed;
+    const tramSpeedNorm = Math.min(1, currentTramSpeed / 1.3);
+    const tramSway = Math.sin(simTime * 4.2) * 0.008 * tramSpeedNorm;
+    tramGroup.position.set(TRAM_LANE_X, 0, currentTramZ);
     tramGroup.rotation.z = tramSway;
 
-    // Animated Tram #120 windshield rain wiper sweep
+    // Animated Tram #120 windshield rain wiper sweep (keeps sweeping even when waiting at red light)
     if (tramWiperPivot) {
       tramWiperPivot.rotation.z = Math.sin(simTime * 4.4) * 0.56;
     }
 
-    // Periodic crisp cyan electrical micro-spark at wet overhead catenary contact strip
+    // Periodic crisp cyan electrical micro-spark at wet overhead catenary contact strip (only while moving)
     const sparkCycle = ((simTime * 0.42 + 0.15) % 1.0 + 1.0) % 1.0;
     const sparkBurst =
-      !printModeActive && sparkCycle > 0.92
+      !printModeActive && tramSpeedNorm > 0.15 && sparkCycle > 0.92
         ? Math.sin(((sparkCycle - 0.92) / 0.08) * Math.PI) *
-          (0.65 + 0.35 * Math.sin(simTime * 95.0))
+          (0.65 + 0.35 * Math.sin(simTime * 95.0)) *
+          tramSpeedNorm
         : 0;
     pantoSparkMat.opacity = sparkBurst * 0.95;
     const sparkScale = 0.46 + sparkBurst * 0.85;
@@ -3664,14 +3776,21 @@ export function createViaductAndVehicles(
     const tSparkScale = 0.50 + tSparkBurst * 0.92;
     trainSparkSprite.scale.set(tSparkScale, tSparkScale, 1);
 
-    // 3. Green-Roof Hong Kong Public Light Bus #28 northbound on east lane (x = +2.05), 28.0s period synced to 14s signal
-    const mbRange = 61.6;
-    const mbSpeed = -2.2;
-    const mbOffset = ((0.70 + 30.8 + simTime * mbSpeed) % mbRange + mbRange) % mbRange;
-    currentMbZ = mbOffset - 30.8;
-    minibusGroup.position.set(2.05, 0, currentMbZ);
-    minibusGroup.rotation.z = Math.sin(simTime * 5.2) * 0.005;
-    const wheelAngle = (simTime * mbSpeed) / 0.30;
+    // 3. Green-Roof Hong Kong Public Light Bus #28 northbound (-Z) on West lane (x = -2.05, HK LHT), signal-synced 28.0s cycle
+    const mbMotion = evalPeriodicCosineMotion(
+      sigClock - 9.0,
+      MB_SEGMENTS,
+      VEHICLE_CYCLE_SEC,
+      MB_LOOP_LEN,
+      MB_STOP_Z,
+      -1,
+      MB_HALF_RANGE
+    );
+    currentMbZ = mbMotion.z;
+    const mbSpeedNorm = Math.min(1, mbMotion.speed / 1.8);
+    minibusGroup.position.set(MINIBUS_LANE_X, 0, currentMbZ);
+    minibusGroup.rotation.z = Math.sin(simTime * 5.2) * 0.005 * mbSpeedNorm;
+    const wheelAngle = -mbMotion.travelDist / 0.30;
     for (const w of mbWheels) {
       w.rotation.x = wheelAngle;
     }
@@ -3680,9 +3799,10 @@ export function createViaductAndVehicles(
       wp.rotation.z = mbWiperAng;
     }
 
-    // 4. Delicate trailing wet-road mist spray behind moving Tram #120 & Minibus #28 wheels
+    // 4. Delicate trailing wet-road mist spray behind moving Tram #120 & Minibus #28 wheels (scales to 0 when stopped)
     if (!printModeActive) {
       for (const sp of spraySprites) {
+        const vNorm = sp.owner === 'tram' ? tramSpeedNorm : mbSpeedNorm;
         const cyc = ((simTime * 1.45 + sp.phase) % 1.0 + 1.0) % 1.0;
         sp.sprite.position.set(
           sp.baseX + Math.sin(simTime * 3.0 + sp.phase) * 0.06,
@@ -3691,7 +3811,7 @@ export function createViaductAndVehicles(
         );
         const sc = 0.48 + cyc * 0.52;
         sp.sprite.scale.set(sc * 1.15, sc * 0.62, 1);
-        sp.mat.opacity = Math.sin(cyc * Math.PI) * 0.13;
+        sp.mat.opacity = Math.sin(cyc * Math.PI) * 0.13 * vNorm;
       }
     }
 
@@ -3708,10 +3828,11 @@ export function createViaductAndVehicles(
     trainGroup,
     taxiGroup,
     minibusGroup,
-    getTramPosition: () => tramPosScratch.set(-1.85, 2.2, currentTramZ),
+    getTramPosition: () => tramPosScratch.set(TRAM_LANE_X, 2.2, currentTramZ),
     getTrainPosition: () => trainPosScratch.set(currentTrainX, railTopY + 1.2, bridgeZ),
-    getMinibusPosition: () => minibusPosScratch.set(2.05, 1.1, currentMbZ),
-    getTramProximity: () => Math.max(0, 1 - Math.abs(currentTramZ - 3.0) / 22.0),
+    getMinibusPosition: () => minibusPosScratch.set(MINIBUS_LANE_X, 1.1, currentMbZ),
+    getTramProximity: () =>
+      Math.max(0, 1 - Math.abs(currentTramZ - 3.0) / 22.0) * Math.min(1, currentTramSpeed / 1.3),
     getTrainProximity: () => Math.max(0, 1 - Math.abs(currentTrainX - 1.0) / 24.0),
     setEmissiveScale: (scale) => {
       currentEmissiveScale = scale;

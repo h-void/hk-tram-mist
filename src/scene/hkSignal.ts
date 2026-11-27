@@ -30,13 +30,14 @@ export interface HKSignalState {
 
 export const HK_SIGNAL_CYCLE_SEC = 14.0;
 export const HK_SIGNAL_PHASE_OFFSET_SEC = 2.1;
+export const HK_PED_FLASH_START_SEC = 5.2;
 
 export function getHKSignalState(simTime: number): HKSignalState {
   const sigClock = simTime + HK_SIGNAL_PHASE_OFFSET_SEC;
   const sigT = ((sigClock % HK_SIGNAL_CYCLE_SEC) + HK_SIGNAL_CYCLE_SEC) % HK_SIGNAL_CYCLE_SEC;
   const cycleIndex = Math.floor(sigClock / HK_SIGNAL_CYCLE_SEC);
 
-  if (sigT < 5.2) {
+  if (sigT < HK_PED_FLASH_START_SEC) {
     return {
       sigClock,
       sigT,

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { ViewMode } from '../ui/hud';
 import { applyRadialMistFade, type RadialMistUniforms } from './atmosphere';
-import { getHKSignalState } from './hkSignal';
+import { getHKSignalState, HK_PED_FLASH_START_SEC } from './hkSignal';
 import { createRippleTexture } from './textures';
 
 interface PetalSeed {
@@ -1430,16 +1430,21 @@ export function createWeatherAndEffects(
         mw.mat.uniforms.uOpacity.value = (1 - u) * 0.52;
       }
 
-      // Hong Kong pedestrian audible crossing signal emerald wavefronts synced to 14s HK clock
-      const crossingActive = sig.crossingAudioActive;
-      const crossingRate = sig.crossingAudioUrgent ? 2.8 : 1.15;
+      // Hong Kong pedestrian audible crossing signal emerald wavefronts synced to exact 1.25 Hz / 6.25 Hz HK cadence
+      const crossingActive = sig.crossingAudioActive && sig.crossingAudioInterval > 0;
+      const crossingRate = crossingActive ? 1.0 / sig.crossingAudioInterval : 0; // 1.25 Hz steady / 6.25 Hz urgent
+      const phaseElapsed = sig.crossingAudioUrgent
+        ? Math.max(0, sig.sigT - HK_PED_FLASH_START_SEC)
+        : Math.max(0, sig.sigT);
+      const beatPhase = phaseElapsed * crossingRate;
       for (const cw of crossingBeepRings) {
         if (!crossingActive) {
           cw.mesh.visible = false;
           continue;
         }
         cw.mesh.visible = true;
-        const u = (((simTime * crossingRate + cw.offset) % 1.0) + 1.0) % 1.0;
+        // Two interleaved rings per pole (offset 0 & 0.5) at beatPhase * 0.5 emit one new wavefront per exact audio beat
+        const u = (((beatPhase * 0.5 + cw.offset) % 1.0) + 1.0) % 1.0;
         const r = 0.35 + u * 2.55;
         cw.mesh.position.set(cw.x, 1.38 + u * 0.32, cw.z);
         cw.mesh.scale.set(r, 1, r);

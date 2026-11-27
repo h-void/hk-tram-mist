@@ -7,7 +7,7 @@
  * - Authentic Hong Kong double-decker tram metallic double-ding bell ("叮叮!") & polite vehicle horns
  */
 
-import type { HKSignalState } from '../scene/hkSignal';
+import { HK_PED_FLASH_START_SEC, type HKSignalState } from '../scene/hkSignal';
 
 export type SoundState = 'idle' | 'on' | 'muted';
 
@@ -20,7 +20,7 @@ export class HKSoundscape {
   private humGain: GainNode | null = null;
   private dropletTimer: number | null = null;
   private noiseBuffer: AudioBuffer | null = null;
-  private lastCrossingBeepTime = -1;
+  private lastCrossingTickKey = -1;
   private unlocked = false;
   private muted = true; // Starts silent until user gesture or unmute toggle
   private userExplicitlyMuted = false;
@@ -279,16 +279,26 @@ export class HKSoundscape {
    * Routed through masterGain so it blends gently into the rainy ambiance and respects mute.
    */
   public updateTrafficSignal(signal: HKSignalState): void {
-    if (!this.ctx || !this.masterGain || this.muted || this.ctx.state !== 'running') return;
-    if (!signal.crossingAudioActive) return;
-
-    const urgent = signal.crossingAudioUrgent;
-    const interval = signal.crossingAudioInterval;
-    const now = this.ctx.currentTime;
-    if (this.lastCrossingBeepTime >= 0 && now - this.lastCrossingBeepTime < interval * 0.92) {
+    if (!signal.crossingAudioActive || signal.crossingAudioInterval <= 0) {
+      this.lastCrossingTickKey = -1;
       return;
     }
-    this.lastCrossingBeepTime = now;
+    if (!this.ctx || !this.masterGain || this.muted || this.ctx.state !== 'running') {
+      this.lastCrossingTickKey = -1;
+      return;
+    }
+
+    const urgent = signal.crossingAudioUrgent;
+    const interval = signal.crossingAudioInterval; // Exact 0.80s (1.25 Hz) or 0.16s (6.25 Hz)
+    const phaseElapsed = urgent
+      ? Math.max(0, signal.sigT - HK_PED_FLASH_START_SEC)
+      : Math.max(0, signal.sigT);
+    const tickIndex = Math.floor(phaseElapsed / interval + 1e-6);
+    const tickKey = signal.cycleIndex * 1000 + (urgent ? 500 : 0) + tickIndex;
+    if (tickKey === this.lastCrossingTickKey) {
+      return;
+    }
+    this.lastCrossingTickKey = tickKey;
     this.playCrossingTick(urgent);
   }
 

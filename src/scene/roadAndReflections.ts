@@ -520,16 +520,7 @@ export function createRoadAndReflections(
   yellowBoxMesh.renderOrder = 3;
   markingsGroup.add(yellowBoxMesh);
 
-  // Hong Kong tarmac pedestrian safety stencils (望左 LOOK LEFT / 望右 LOOK RIGHT)
-  const stencilLeftMat = new THREE.MeshStandardMaterial({
-    map: createRoadStencilTexture('left'),
-    transparent: true,
-    opacity: 0.82,
-    roughness: 0.70,
-    depthWrite: false,
-    polygonOffset: true,
-    polygonOffsetFactor: -1
-  });
+  // Hong Kong tarmac pedestrian safety stencils: authentic HK two-way LHT has 望右 LOOK RIGHT on BOTH curbs
   const stencilRightMat = new THREE.MeshStandardMaterial({
     map: createRoadStencilTexture('right'),
     transparent: true,
@@ -540,7 +531,7 @@ export function createRoadAndReflections(
     polygonOffsetFactor: -1
   });
 
-  // East-side curb edge (pedestrians stepping off east sidewalk toward zebra): LOOK RIGHT / 望右
+  // East-side curb edge (pedestrians stepping off east sidewalk facing west toward LHT southbound tram): LOOK RIGHT / 望右 (arrow -> -Z North)
   const eastStencil = new THREE.Mesh(new THREE.PlaneGeometry(1.42, 0.72), stencilRightMat);
   eastStencil.rotation.x = -Math.PI / 2;
   eastStencil.rotation.z = Math.PI / 2;
@@ -550,8 +541,8 @@ export function createRoadAndReflections(
   eastStencil.userData.skipPrintEdges = true;
   markingsGroup.add(eastStencil);
 
-  // West-side curb edge (pedestrians stepping off west sidewalk watching southbound tram): LOOK LEFT / 望左
-  const westStencil = new THREE.Mesh(new THREE.PlaneGeometry(1.42, 0.72), stencilLeftMat);
+  // West-side curb edge (pedestrians stepping off west sidewalk facing east toward LHT northbound minibus): LOOK RIGHT / 望右 (arrow -> +Z South)
+  const westStencil = new THREE.Mesh(new THREE.PlaneGeometry(1.42, 0.72), stencilRightMat);
   westStencil.rotation.x = -Math.PI / 2;
   westStencil.rotation.z = -Math.PI / 2;
   westStencil.position.set(-3.55, 0.033, 5.12);
@@ -585,6 +576,7 @@ export function createRoadAndReflections(
   }
 
   // Signature Hong Kong painted Double Yellow No-Parking Lines (雙黃線) along both curbs (x = ±4.80 & ±4.93)
+  // East curb breaks cleanly across the metered taxi parking bay driveway (z in [9.2, 14.0]) with HK end-bars & white bay-access dashes
   const doubleYellowTex = createDoubleYellowPaintTexture();
   const doubleYellowMat = new THREE.MeshStandardMaterial({
     map: doubleYellowTex,
@@ -598,17 +590,68 @@ export function createRoadAndReflections(
   });
   applyRadialMistFade(doubleYellowMat, mistUniforms, roadMistFade);
 
-  const lineGeom = new THREE.PlaneGeometry(0.062, ROAD_LEN);
-  for (const side of [-1, 1]) {
-    for (const xAbs of [4.80, 4.93]) {
-      const line = new THREE.Mesh(lineGeom, doubleYellowMat);
-      line.rotation.x = -Math.PI / 2;
-      line.position.set(side * xAbs, 0.031, 0);
-      line.receiveShadow = true;
-      line.renderOrder = 3;
-      line.userData.skipPrintEdges = true;
-      markingsGroup.add(line);
+  const addYellowSegment = (xPos: number, zStart: number, zEnd: number) => {
+    const segLen = zEnd - zStart;
+    if (segLen <= 0.05) return;
+    const geom = new THREE.PlaneGeometry(0.062, segLen);
+    const uvAttr = geom.attributes.uv as THREE.BufferAttribute;
+    const vScale = segLen / ROAD_LEN;
+    for (let i = 0; i < uvAttr.count; i++) {
+      uvAttr.setY(i, uvAttr.getY(i) * vScale);
     }
+    const line = new THREE.Mesh(geom, doubleYellowMat);
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(xPos, 0.031, (zStart + zEnd) * 0.5);
+    line.receiveShadow = true;
+    line.renderOrder = 3;
+    line.userData.skipPrintEdges = true;
+    markingsGroup.add(line);
+  };
+
+  const halfRoad = ROAD_LEN * 0.5;
+  const eastBayGapZ0 = 9.2;
+  const eastBayGapZ1 = 14.0;
+  for (const xAbs of [4.80, 4.93]) {
+    // West curb: continuous double yellow no-stopping restriction
+    addYellowSegment(-xAbs, -halfRoad, halfRoad);
+    // East curb: split cleanly north & south of the metered taxi parking bay entry
+    addYellowSegment(xAbs, -halfRoad, eastBayGapZ0);
+    addYellowSegment(xAbs, eastBayGapZ1, halfRoad);
+  }
+
+  // Authentic Hong Kong transverse yellow termination end-bars flanking the parking bay gap
+  const endBarGeom = new THREE.PlaneGeometry(0.22, 0.07);
+  for (const capZ of [eastBayGapZ0, eastBayGapZ1]) {
+    const cap = new THREE.Mesh(endBarGeom, doubleYellowMat);
+    cap.rotation.x = -Math.PI / 2;
+    cap.position.set(4.87, 0.0315, capZ);
+    cap.receiveShadow = true;
+    cap.renderOrder = 3;
+    cap.userData.skipPrintEdges = true;
+    markingsGroup.add(cap);
+  }
+
+  // Broken white kerbside bay-access / pick-up dashed markings (白虛線) across the taxi bay driveway
+  const bayDashMat = new THREE.MeshStandardMaterial({
+    color: 0xe6edf4,
+    roughness: 0.55,
+    metalness: 0.06,
+    transparent: true,
+    opacity: 0.80,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -1
+  });
+  applyRadialMistFade(bayDashMat, mistUniforms, roadMistFade);
+  const bayDashGeom = new THREE.PlaneGeometry(0.085, 0.52);
+  for (let dz = 9.65; dz <= 13.55; dz += 0.92) {
+    const dash = new THREE.Mesh(bayDashGeom, bayDashMat);
+    dash.rotation.x = -Math.PI / 2;
+    dash.position.set(4.86, 0.0315, dz);
+    dash.receiveShadow = true;
+    dash.renderOrder = 3;
+    dash.userData.skipPrintEdges = true;
+    markingsGroup.add(dash);
   }
 
   const grateMat = new THREE.MeshStandardMaterial({
@@ -714,7 +757,7 @@ export function createRoadAndReflections(
   reflector.name = 'PlanarWetRoadReflector';
   group.add(reflector);
 
-  // 6. Twin Recessed Glistening Steel Tram Rails (x = -1.85 southbound track and x = +1.85 northbound track)
+  // 6. Twin Recessed Glistening Steel Tram Rails (HK LHT: x = -1.85 northbound track and x = +1.85 southbound track)
   const railsGroup = new THREE.Group();
   railsGroup.name = 'TramRailsGroup';
 
